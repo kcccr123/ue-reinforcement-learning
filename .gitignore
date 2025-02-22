@@ -1,0 +1,6 @@
+Binaries/
+Intermediate/
+*.pdb
+*.dll
+*.exp
+*.gen.cpp
