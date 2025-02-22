@@ -1,4 +1,3 @@
-#include "UERLPlugin.h"
 #include "Modules/ModuleManager.h"
 
 // This class implements the core startup/shutdown for your plugin module.
