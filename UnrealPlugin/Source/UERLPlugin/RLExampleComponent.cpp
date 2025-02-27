@@ -26,3 +26,4 @@ void URLExampleComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
         UE_LOG(LogTemp, Log, TEXT("Actor Location Rl Component: %s"), *CurrentActorLocation.ToString());
     }
 }
+                
