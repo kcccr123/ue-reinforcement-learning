@@ -14,7 +14,7 @@ class UERLPLUGIN_API URLPawnBridge : public URLBaseBridge
 
 public:
     // Set the pawn that this bridge will control.
-    UFUNCTION(BlueprintCallable, Category = "RL|PawnBridge")
+    UFUNCTION(BlueprintCallable, Category = "RLBridge")
     virtual void SetControlledPawn(APawn* InPawn);
 
     // Override UpdateRL to handle state gathering and action application for the pawn.
