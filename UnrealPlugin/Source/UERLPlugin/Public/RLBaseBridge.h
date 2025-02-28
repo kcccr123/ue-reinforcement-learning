@@ -34,6 +34,9 @@ protected:
     // Default implementation for sending data over TCP.
     virtual bool SendData(const FString& Data);
 
+    // Default implementation for sending data over TCP.
+    virtual float CalculateReward();
+
     // Default implementation for receiving data over TCP.
     virtual FString ReceiveData();
 
