@@ -6,11 +6,16 @@
 #include "HAL/PlatformProcess.h"
 
 
+void URLBaseBridge::InitializeBridge()
+{
+    UE_LOG(LogTemp, Error, TEXT("Bridge Initialized."));
+}
+
 bool URLBaseBridge::Connect(const FString& IPAddress, int32 Port)
 {
     CurrentIP = IPAddress;
     CurrentPort = Port;
-    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Connecting to %s:%d"), *IPAddress, Port);
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Starting TCP server on %s:%d"), *IPAddress, Port);
 
     // Get the socket subsystem
     ISocketSubsystem* SocketSubsystem = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
@@ -20,38 +25,47 @@ bool URLBaseBridge::Connect(const FString& IPAddress, int32 Port)
         return false;
     }
 
-    // Create the TCP socket using the TcpSocketBuilder for ease
-    ConnectionSocket = FTcpSocketBuilder(TEXT("RL_TcpSocket"))
+    // Create a listening socket that binds to any address on the given port.
+    ConnectionSocket = FTcpSocketBuilder(TEXT("RL_TcpServer"))
         .AsReusable()
-        .AsBlocking(); // For now, blocking calls are acceptable for our prototype
-
+        .BoundToAddress(FIPv4Address::Any)
+        .BoundToPort(Port)
+        .Listening(8); // Allow up to 8 pending connections
     if (!ConnectionSocket)
     {
-        UE_LOG(LogTemp, Error, TEXT("RLBaseBridge: Failed to create TCP socket."));
+        UE_LOG(LogTemp, Error, TEXT("RLBaseBridge: Failed to create listening socket."));
         return false;
     }
 
-    // Resolve IP address and set up the remote endpoint
-    FIPv4Address IP;
-    FIPv4Address::Parse(IPAddress, IP);
-    TSharedRef<FInternetAddr> RemoteAddress = SocketSubsystem->CreateInternetAddr();
-    RemoteAddress->SetIp(IP.Value);
-    RemoteAddress->SetPort(Port);
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Listening on port %d"), Port);
 
-    // Attempt to connect
-    bool bConnected = ConnectionSocket->Connect(*RemoteAddress);
-    if (!bConnected)
+    // Wait for an incoming connection by checking the value of bHasPendingConnection.
+    bool bHasPendingConnection = false;
+    while (!bHasPendingConnection)
     {
-        UE_LOG(LogTemp, Error, TEXT("RLBaseBridge: Connection failed to %s:%d"), *IPAddress, Port);
-        ConnectionSocket->Close();
-        ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(ConnectionSocket);
-        ConnectionSocket = nullptr;
+        ConnectionSocket->HasPendingConnection(bHasPendingConnection);
+        FPlatformProcess::Sleep(0.1f);
+    }
+
+    // Accept the incoming connection.
+    TSharedRef<FInternetAddr> RemoteAddress = SocketSubsystem->CreateInternetAddr();
+    FSocket* ClientSocket = ConnectionSocket->Accept(*RemoteAddress, TEXT("RL_ClientSocket"));
+    if (!ClientSocket)
+    {
+        UE_LOG(LogTemp, Error, TEXT("RLBaseBridge: Failed to accept connection."));
         return false;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Successfully connected to %s:%d"), *IPAddress, Port);
+    // Destroy the listening socket and use the accepted client socket.
+    ConnectionSocket->Close();
+    SocketSubsystem->DestroySocket(ConnectionSocket);
+    ConnectionSocket = ClientSocket;
+
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Accepted connection"));
     return true;
 }
+
+
 
 void URLBaseBridge::Disconnect()
 {
@@ -62,6 +76,11 @@ void URLBaseBridge::Disconnect()
         ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(ConnectionSocket);
         ConnectionSocket = nullptr;
     }
+}
+
+void URLBaseBridge::UpdateRL(float DeltaTime)
+{
+    UE_LOG(LogTemp, Error, TEXT("Updaing"));
 }
 
 bool URLBaseBridge::SendData(const FString& Data)
@@ -112,4 +131,40 @@ FString URLBaseBridge::ReceiveData()
     FString ReceivedString = FString(UTF8_TO_TCHAR(reinterpret_cast<const char*>(DataBuffer)));
     UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Received data -> %s"), *ReceivedString);
     return ReceivedString;
+}
+
+
+float URLBaseBridge::CalculateReward_Implementation(bool& bDone)
+{
+    // Default is zero reward, not done
+    bDone = false;
+    return 0.0f;
+}
+
+FString URLBaseBridge::CreateStateString_Implementation()
+{
+    return FString();
+}
+
+void URLBaseBridge::HandleReset_Implementation()
+{
+    // Default empty implementation.
+}
+
+void URLBaseBridge::HandleResponseActions_Implementation(const FString& actions)
+{
+    // Default empty implementation.
+}
+
+
+void URLBaseBridge::Tick(float DeltaTime)
+{
+    // Call UpdateRL each frame
+    UE_LOG(LogTemp, Log, TEXT("What the fuck"));
+    UpdateRL(DeltaTime);
+}
+
+TStatId URLBaseBridge::GetStatId() const
+{
+    RETURN_QUICK_DECLARE_CYCLE_STAT(URLBaseBridge, STATGROUP_Tickables);
 }

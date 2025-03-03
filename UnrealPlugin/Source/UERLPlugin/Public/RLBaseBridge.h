@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
+#include "Tickable.h"
 #include "RLBaseBridge.generated.h"
 
 /**
@@ -9,7 +10,7 @@
  * This class provides a default implementation for connecting and disconnecting via TCP.
  */
 UCLASS(Abstract, Blueprintable)
-class UERLPLUGIN_API URLBaseBridge : public UObject
+class UERLPLUGIN_API URLBaseBridge : public UObject, public FTickableGameObject
 {
     GENERATED_BODY()
 
@@ -34,8 +35,19 @@ protected:
     // Default implementation for sending data over TCP.
     virtual bool SendData(const FString& Data);
 
-    // Default implementation for sending data over TCP.
-    virtual float CalculateReward();
+    // abstract implementation for calculating reward (implement in sub classes)
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge")
+    float CalculateReward(bool& bDone);
+
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge")
+    FString CreateStateString();
+
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge")
+    void HandleReset();
+
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge")
+    void HandleResponseActions(const FString& actions);
+
 
     // Default implementation for receiving data over TCP.
     virtual FString ReceiveData();
@@ -46,4 +58,24 @@ protected:
     // socket info (set on connection)
     FString CurrentIP;
     int32 CurrentPort;
+
+
+    //---------------------------------------------------------
+    // FTickableGameObject Interface:
+    //---------------------------------------------------------
+public:
+    // Called every frame by the engine.
+    virtual void Tick(float DeltaTime) override;
+
+    // Return true so that this object is tickable.
+    virtual bool IsTickable() const override { return true; }
+
+    // Return false to disable ticking when the game is paused.
+    virtual bool IsTickableWhenPaused() const override { return false; }
+
+    // Specifies that this object should always tick.
+    virtual ETickableTickType GetTickableTickType() const override { return ETickableTickType::Always; }
+
+    // Returns a stat ID for profiling purposes.
+    virtual TStatId GetStatId() const override;
 };

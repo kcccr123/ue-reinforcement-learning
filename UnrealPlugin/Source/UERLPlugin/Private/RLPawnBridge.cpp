@@ -13,12 +13,11 @@ void URLPawnBridge::SetControlledPawn(APawn* InPawn)
     {
         UE_LOG(LogTemp, Warning, TEXT("RLPawnBridge: Provided pawn is null."));
     }
-}
+} 
 
 void URLPawnBridge::UpdateRL(float DeltaTime)
 {
-    // Call the base implementation (optional)
-    Super::UpdateRL(DeltaTime);
+    // should have a default definition of UpdateRL in the base class.
 
     if (!ControlledPawn)
     {
@@ -26,28 +25,132 @@ void URLPawnBridge::UpdateRL(float DeltaTime)
         return;
     }
 
+    if (!ConnectionSocket)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("RLPawnBridge: Not Connected to a socket."));
+        return;
+    }
+
     // ---------------------- MAKE STATE STRING ---------------------------------
+
+    // this entire section should also be converted to a blueprint native function in the future
+    // user defined function that outputs a string of data to be sent to external python wrapper.
 
     // get pawn state
     FVector PawnLocation = ControlledPawn->GetActorLocation();
     FQuat PawnRotation = ControlledPawn->GetActorQuat(); // Get rotation as a quaternion
+
+    bool bDone = false;
+    float Reward = CalculateReward(bDone);
+    int32 DoneInt = bDone ? 1 : 0;
 
     // send position and quat
     FString PosString = FString::Printf(TEXT("%.2f,%.2f,%.2f"), PawnLocation.X, PawnLocation.Y, PawnLocation.Z);
     FString QuatString = FString::Printf(TEXT("%.2f,%.2f,%.2f,%.2f"), PawnRotation.W, PawnRotation.X, PawnRotation.Y, PawnRotation.Z);
 
     // Combine both into one state string (using a delimiter, e.g., semicolon)
-    FString StateString = PosString + TEXT(";") + QuatString;
+    FString DataToSend = FString::Printf(TEXT("%s;%s;%.2f;%d"), *PosString, *QuatString, Reward, DoneInt);
+
 
     // ---------------------- MAKE STATE STRING ---------------------------------
 
     // send data
-    SendData(StateString);
+    SendData(DataToSend);
 
     // recieve response
     FString ActionResponse = ReceiveData();
     if (!ActionResponse.IsEmpty())
     {
+        if (ActionResponse.Equals("RESET"))
+        {
+            HandleReset();
+            return;
+        }
+
+        HandleResponseActions(ActionResponse);
+
         // interpret response and call actions on class here
     }
+}
+
+
+float URLPawnBridge::CalculateReward_Implementation(bool& bDone)
+{
+    if (!ControlledPawn)
+    {
+        bDone = false;
+        return 0.0f;
+    }
+
+    // user can override distance threshold, location, etc. in BP or child class
+    float Reward = 0.0f;
+    bDone = false;
+
+
+    // ------- Movement Training -------------
+    // Target location
+    // This will teach model to only move to 100 100 100 each time. 
+    // Need to pass commands through observation state for dynamic movement
+    FVector Target(100.f, 100.f, 100.f);
+    float Dist = FVector::Dist(ControlledPawn->GetActorLocation(), Target);
+
+    // higher reward as you get closer to location
+    Reward += 1 / Dist;
+    if (Dist < 1.0f)
+    {
+        Reward += 10000.f; // big reward
+        bDone = true;
+    }
+    // ------- Movement Training -------------
+
+
+    // reset simulaton if 180 frames have passed
+    if (passes == 180) {
+        bDone = true;
+    }
+
+    passes += 1;
+
+    return Reward;
+}
+
+void URLPawnBridge::HandleReset_Implementation()
+{
+    AFighterPawn* FighterPawn = Cast<AFighterPawn>(ControlledPawn);
+
+    // reset pawn to starting point
+    FighterPawn->SetActorLocation(FVector(0, 0, 0));
+    FighterPawn->SetActorRotation(FRotator(0, 0, 0));
+    FighterPawn->InitFighter(1.0, 1.0);
+    passes = 0;
+}
+
+FString URLPawnBridge::CreateStateString_Implementation()
+{
+    return FString();
+}
+
+void URLPawnBridge::HandleResponseActions_Implementation(const FString& actions)
+{
+    AFighterPawn* FighterPawn = Cast<AFighterPawn>(ControlledPawn);
+
+    // parse actions
+    TArray<FString> ActionStrings;
+    actions.ParseIntoArray(ActionStrings, TEXT(","), true);
+    TArray<float> ActionValues;
+    for (const FString& ActionStr : ActionStrings)
+    {
+        float Value = FCString::Atof(*ActionStr);
+        ActionValues.Add(Value);
+    }
+
+
+    // then apply to pawn
+    FighterPawn->ForwardBackThrust(ActionValues[0]);
+    FighterPawn->LeftRightThrust(ActionValues[1]);
+    FighterPawn->UpDownThrust(ActionValues[2]);
+
+    FighterPawn->ApplyTorque(FVector(ActionValues[3], ActionValues[4], ActionValues[5]));
+
+
 }

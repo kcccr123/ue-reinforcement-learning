@@ -4,3 +4,5 @@ Intermediate/
 *.dll
 *.exp
 *.gen.cpp
+
+__pycache__
