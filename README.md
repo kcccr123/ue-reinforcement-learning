@@ -56,49 +56,14 @@ The framework features a minimal setup process to get you started fast. Its desi
 
 ## Installation
 
-To run this project, you can either clone the repository and run inside an android emulator,
 
-OR
-
-Download the latest version of the .apk from either the GitHub releases or the following Google Drive to use on your phone immediately:  
-[Download The App Here](https://drive.google.com/drive/folders/1gMsgvBpB-5DIYCYthU_EozF8zWHmHyqh)
 
 ### Prerequisites
 
-If you are cloning this repository, please follow the instructions below to set up the Expo development environment and a mobile emulator if you do not already have them set up:  
-[Expo documentation](https://docs.expo.dev/get-started/set-up-your-environment/?mode=development-build&buildEnv=local&platform=android&device=simulated)
+
 
 ### Getting Started
 
-Clone the repository and run:
-
-```sh
-npm install --legacy-peer-deps
-```
-
-Please make sure you have installed an emulator and virtual device as specified in the prerequisites.
-After starting a device on your emulator, run the following command for your respective device type:
-
-iOS
-
-```sh
-npx expo run:ios
-```
-
-Android
-
-```sh
-npx expo run:android
-```
-
-Now, Expo should begin building a development build on your emulator.
-
-For more details, follow:  
-[Expo documentation](https://docs.expo.dev/get-started/set-up-your-environment/?mode=development-build&buildEnv=local&platform=android&device=simulated)
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-<!-- USAGE -->
 
 ## Usage
 
