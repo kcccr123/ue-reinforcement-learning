@@ -159,9 +159,10 @@ void URLBaseBridge::HandleResponseActions_Implementation(const FString& actions)
 
 void URLBaseBridge::Tick(float DeltaTime)
 {
-    // Call UpdateRL each frame
-    UE_LOG(LogTemp, Log, TEXT("What the fuck"));
-    UpdateRL(DeltaTime);
+    if (ConnectionSocket)
+    {
+        UpdateRL(DeltaTime);
+    }
 }
 
 TStatId URLBaseBridge::GetStatId() const
