@@ -1,0 +1,8 @@
+Binaries/
+Intermediate/
+*.pdb
+*.dll
+*.exp
+*.gen.cpp
+
+__pycache__
