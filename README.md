@@ -56,14 +56,39 @@ The framework features a minimal setup process to get you started fast. Its desi
 
 ## Installation
 
-
+Follow the instructions below to get started.
 
 ### Prerequisites
 
+[Unreal Engine 5.3 and above](https://www.unrealengine.com/en-US/download)
 
 
 ### Getting Started
 
+Open your terminal and clone the repository to your local machine:
+
+`git clone https://github.com/kcccr123/ue-reinforcement-learning.git`
+
+The repository is split into an external python module and an Unreal Editor project plugin. 
+
+#### Unreal Setup
+
+1. Copy the entire plugin folder, `UnrealPlugin` into the Plugins directory of your Unreal project.
+
+If the Plugins folder doesn’t exist, create one in the root of your project. The folder structure of your Unreal project should look like this: 
+
+```plaintext
+YourUnrealProject/
+└── Plugins/
+    └── UnrealPlugin/
+```
+2. Enable the plugin inside the Unreal Editor.
+   
+Open your Unreal project inside the editor. Navigate to Edit > Plugins. Locate your plugin in the list (it might be under a relevant category such as "Other" or "Installed Plugins"). Check the box to enable the plugin. Restart Unreal Engine if prompted.
+
+#### Python Setup
+
+It is recommended you create a virtual enviornment to keep track of your packages. 
 
 ## Usage
 
