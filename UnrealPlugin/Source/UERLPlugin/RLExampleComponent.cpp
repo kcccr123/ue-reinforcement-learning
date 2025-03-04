@@ -23,6 +23,7 @@ void URLExampleComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
         CurrentActorLocation = Owner->GetActorLocation();
         // TODO: In a real scenario, you'd store or send this data.
         // E.g., Send this position to a Python RL agent, or log it for debugging.
-        UE_LOG(LogTemp, Log, TEXT("Actor Location: %s"), *CurrentActorLocation.ToString());
+        UE_LOG(LogTemp, Log, TEXT("Actor Location Rl Component: %s"), *CurrentActorLocation.ToString());
     }
 }
+                
