@@ -20,7 +20,7 @@ class GymWrapperBase:
             print(f"[GymWrapperBase] Connected to {self.ip}:{self.port}")
         except Exception as e:
             print(f"[GymWrapperBase] Failed to connect: {e}")
-    
+
     def disconnect(self):
         """
         Close the TCP connection.
@@ -29,6 +29,13 @@ class GymWrapperBase:
             self.sock.close()
             self.sock = None
             print("[GymWrapperBase] Disconnected.")
+
+    def close(self):
+        """
+        Shuts down the training enviornment.
+        """
+        # add more enviornment shutdown stuff here in the future
+        self.disconnect()
     
     def send_data(self, data: str):
         """

@@ -91,21 +91,22 @@ float URLPawnBridge::CalculateReward_Implementation(bool& bDone)
     // Target location
     // This will teach model to only move to 100 100 100 each time. 
     // Need to pass commands through observation state for dynamic movement
-    FVector Target(100.f, 100.f, 100.f);
+    FVector Target(1000.f, 1000.f, 1000.f);
     float Dist = FVector::Dist(ControlledPawn->GetActorLocation(), Target);
 
     // higher reward as you get closer to location
-    Reward += 1 / Dist;
-    if (Dist < 1.0f)
+    float scaleFactor = 1000.f; // adjust based on your environment scale
+    Reward += FMath::Exp(-Dist / scaleFactor);
+    if (Dist < 100.0f)
     {
-        Reward += 10000.f; // big reward
+        Reward += 10000000000.f; // big reward
         bDone = true;
     }
     // ------- Movement Training -------------
 
 
     // reset simulaton if 180 frames have passed
-    if (passes == 180) {
+    if (passes >= 1048) {
         bDone = true;
     }
 
@@ -116,6 +117,7 @@ float URLPawnBridge::CalculateReward_Implementation(bool& bDone)
 
 void URLPawnBridge::HandleReset_Implementation()
 {
+    UE_LOG(LogTemp, Log, TEXT("Resetting!"));
     AFighterPawn* FighterPawn = Cast<AFighterPawn>(ControlledPawn);
 
     // reset pawn to starting point
@@ -144,7 +146,7 @@ void URLPawnBridge::HandleResponseActions_Implementation(const FString& actions)
         ActionValues.Add(Value);
     }
 
-
+    UE_LOG(LogTemp, Log, TEXT("Applying Actions!"));
     // then apply to pawn
     FighterPawn->ForwardBackThrust(ActionValues[0]);
     FighterPawn->LeftRightThrust(ActionValues[1]);

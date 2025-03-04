@@ -83,7 +83,7 @@ class GymWrapperPawn(gym.Env, GymWrapperBase):
             pos = [float(v) for v in pos_str.split(",")]
             quat = [float(v) for v in quat_str.split(",")]
             reward = float(reward_str)
-            done = bool(done_str)
+            done = bool(int(done_str))
             # Combine into a single array
             obs = np.array(pos + quat, dtype=np.float32)
             return obs, reward, done
