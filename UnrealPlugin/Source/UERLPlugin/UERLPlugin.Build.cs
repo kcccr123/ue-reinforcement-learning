@@ -14,7 +14,8 @@ public class UERLPlugin : ModuleRules
                 "Engine",
                 "InputCore",
                 "Sockets",
-                "Networking"
+                "Networking",
+                "star_fighter"
             }
         );
     }
