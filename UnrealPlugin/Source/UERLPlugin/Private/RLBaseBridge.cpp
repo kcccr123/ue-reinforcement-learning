@@ -70,6 +70,8 @@ bool URLBaseBridge::Connect(const FString& IPAddress, int32 port, int32 actionSp
 
     UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Accepted connection"));
 
+
+
     // send the handshake to the Python environment 
     SendHandshake();
 
@@ -133,6 +135,14 @@ void URLBaseBridge::UpdateRL(float DeltaTime)
             HandleReset();
             return;
         }
+
+        if (ActionResponse.Equals("TRAINING_COMPLETE"))
+        {
+            // reset if simulation is done
+            HandleReset();
+            Disconnect();
+            return;
+        }
         // interpret response and apply given actions
         HandleResponseActions(ActionResponse);
     }
@@ -147,8 +157,11 @@ bool URLBaseBridge::SendData(const FString& Data)
         return false;
     }
 
+    // Append the "STEP" delimiter to the message.
+    FString DataWithDelimiter = Data + TEXT("STEP");
+
     // Convert FString to UTF-8
-    FTCHARToUTF8 Converter(*Data);
+    FTCHARToUTF8 Converter(*DataWithDelimiter);
     int32 BytesToSend = Converter.Length();
     int32 BytesSent = 0;
 
@@ -159,7 +172,7 @@ bool URLBaseBridge::SendData(const FString& Data)
         return false;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Sent data -> %s"), *Data);
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Sent data -> %s"), *DataWithDelimiter);
     return true;
 }
 

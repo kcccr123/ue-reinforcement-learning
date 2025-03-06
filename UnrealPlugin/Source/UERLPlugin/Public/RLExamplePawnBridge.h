@@ -4,13 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "RLBaseBridge.h"
-#include "RLExamplePawn.generated.h"
+#include "RLExamplePawnBridge.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class UERLPLUGIN_API URLExamplePawn : public URLBaseBridge
+class UERLPLUGIN_API URLExamplePawnBridge : public URLBaseBridge
 {
 	GENERATED_BODY()
 	
