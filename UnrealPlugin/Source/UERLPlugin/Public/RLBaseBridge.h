@@ -28,6 +28,7 @@ public:
 
     // Sends TCP handshake to python environment.
     // Called once connection is made; sends any information the python environment needs before training starts.
+    // If overriden, user needs to make sure to send action and observation space size in handshake.
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge")
     void SendHandshake();
     virtual void SendHandshake_Implementation();

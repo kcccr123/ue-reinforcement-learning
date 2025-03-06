@@ -79,7 +79,7 @@ bool URLBaseBridge::Connect(const FString& IPAddress, int32 port, int32 actionSp
 
 void URLBaseBridge::SendHandshake_Implementation()
 {
-    FString HandshakeMessage = FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d"), ActionSpaceSize, ObservationSpaceSize);
+    FString HandshakeMessage = FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d"), ObservationSpaceSize, ActionSpaceSize);
 
     bool bSent = SendData(HandshakeMessage);
     if (bSent)

@@ -20,7 +20,7 @@ class GymWrapperPawn(gym.Env, GymWrapperBase):
         # Initialize our base TCP connection (which also processes the handshake)
         GymWrapperBase.__init__(self, ip, port)
         
-        # Use the dynamically received shapes from the handshake
+        # Create action and observation spaces
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.obs_shape,), dtype=np.float32)
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(self.act_shape,), dtype=np.float32)
     
