@@ -30,7 +30,7 @@ bool URLBaseBridge::Connect(const FString& IPAddress, int32 Port)
         .AsReusable()
         .BoundToAddress(FIPv4Address::Any)
         .BoundToPort(Port)
-        .Listening(8); // Allow up to 8 pending connections
+        .Listening(1);
     if (!ConnectionSocket)
     {
         UE_LOG(LogTemp, Error, TEXT("RLBaseBridge: Failed to create listening socket."));
@@ -80,7 +80,33 @@ void URLBaseBridge::Disconnect()
 
 void URLBaseBridge::UpdateRL(float DeltaTime)
 {
-    UE_LOG(LogTemp, Error, TEXT("Updaing"));
+    UE_LOG(LogTemp, Log, TEXT("Updaing"));
+    // ---------------------- MAKE STATE STRING ---------------------------------
+    bool bDone = false;
+    float Reward = CalculateReward(bDone);
+    int32 DoneInt = bDone ? 1 : 0;
+
+    // Combine both into one state string (using a delimiter, e.g., semicolon)
+    FString DataToSend = FString::Printf(TEXT("%s%.2f;%d"), CreateStateString(), Reward, DoneInt);
+
+    // ---------------------- MAKE STATE STRING ---------------------------------
+    // send data
+    SendData(DataToSend);
+
+    // recieve response
+    FString ActionResponse = ReceiveData();
+    if (!ActionResponse.IsEmpty())
+    {
+        if (ActionResponse.Equals("RESET"))
+        {
+            // reset if simulation is done
+            HandleReset();
+            return;
+        }
+        // interpret response and apply given actions
+        HandleResponseActions(ActionResponse);
+    }
+
 }
 
 bool URLBaseBridge::SendData(const FString& Data)

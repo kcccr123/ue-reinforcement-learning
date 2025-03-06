@@ -6,7 +6,7 @@ from .gym_wrapper_base import GymWrapperBase
 
 class GymWrapperPawn(gym.Env, GymWrapperBase):
     """
-    A Gym environment for controlling a single pawn in Unreal.
+    A Gym environment implementation example for controlling a single pawn in Unreal.
     Inherits TCP logic from GymWrapperBase and the Gym Env interface from gym.Env.
     """
     def __init__(self, ip='127.0.0.1', port=7777):
