@@ -7,7 +7,8 @@
 
 /**
  * Base class for RL communication using TCP.
- * This class provides a default implementation for connecting and disconnecting via TCP.
+ * This class provides a framework for setting up your RL enviornment in Unreal Engine.
+ * Includes a default implementation for connecting and disconnecting via TCP.
  */
 UCLASS(Abstract, Blueprintable)
 class UERLPLUGIN_API URLBaseBridge : public UObject, public FTickableGameObject

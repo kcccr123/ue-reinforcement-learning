@@ -24,7 +24,7 @@ ENV_PORT = 7777            # Port for the Unreal TCP server
 TOTAL_TIMESTEPS = 100000   # How long we train
 LEARNING_RATE = 3e-4       # Learning rate for the RL algorithm
 GAMMA = 0.99               # Discount factor
-N_STEPS = 1048             # Batch size per update (PPO or On-Policy Algos)
+N_STEPS = 1024            # Batch size per update (PPO or On-Policy Algos)
 
 MODEL_NAME = "fighter_model"  # Filename prefix for saving the model
 
