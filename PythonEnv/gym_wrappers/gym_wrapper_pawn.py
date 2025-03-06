@@ -3,31 +3,26 @@ import gymnasium as gym
 from gymnasium import spaces
 from .gym_wrapper_base import GymWrapperBase
 
-
 class GymWrapperPawn(gym.Env, GymWrapperBase):
     """
-    A Gym environment implementation example for controlling a single pawn in Unreal.
+    A Gym environment implementation for controlling a single pawn in Unreal.
     Inherits TCP logic from GymWrapperBase and the Gym Env interface from gym.Env.
     """
     def __init__(self, ip='127.0.0.1', port=7777):
         """
         Initialize the Pawn environment:
         - Connect to Unreal via TCP.
-        - Define observation and action spaces.
+        - The handshake in the base class sets self.obs_shape and self.act_shape.
+        - Define observation and action spaces dynamically.
         """
         # Initialize Gym's Env
         gym.Env.__init__(self)
-        # Initialize our base TCP connection
+        # Initialize our base TCP connection (which also processes the handshake)
         GymWrapperBase.__init__(self, ip, port)
         
-        # determines number of data points coming in from unreal
-        # shape=(7,) 
-        # => 7 floats coming in from unreal => 3 for position (x,y,z) + 4 for quaternion (w,x,y,z)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)
-        
-        # shape(6, ) => sends two floats back to unreal
-        # 6 floats, 3 for thurst, fowardBack, leftRight, upDown and 3 for torque vector.
-        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(6,), dtype=np.float32)
+        # Use the dynamically received shapes from the handshake
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.obs_shape,), dtype=np.float32)
+        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(self.act_shape,), dtype=np.float32)
     
     def reset(self, seed=None, options=None):
         """
@@ -41,10 +36,8 @@ class GymWrapperPawn(gym.Env, GymWrapperBase):
             
     def step(self, action):
         """
-        The main interaction point: sends the action to Unreal,
-        then receives the new state. Returns (observation, reward, done, info).
-        For now, reward is 0.0 and done is False by default, if we're deferring
-        reward logic to the Unreal side.
+        Sends the action to Unreal, then receives the new state.
+        Returns (observation, reward, done, info).
         """
         # Convert the action array to a comma-separated string, e.g. "0.50,0.25"
         action_str = ",".join([f"{a:.2f}" for a in action])

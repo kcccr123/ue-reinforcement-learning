@@ -8,7 +8,10 @@ class GymWrapperBase:
         self.ip = ip
         self.port = port
         self.sock = None
+        self.obs_shape = 0 
+        self.act_shape = 0  
         self.connect()
+        self._receive_handshake()
     
     def connect(self):
         """
@@ -21,6 +24,29 @@ class GymWrapperBase:
         except Exception as e:
             print(f"[GymWrapperBase] Failed to connect: {e}")
 
+    def _receive_handshake(self):
+        """
+        Receive and parse the handshake message from Unreal.
+        Expected format: "CONFIG:OBS=<obs_shape>;ACT=<act_shape>"
+        """
+        handshake = self.receive_data()
+        if handshake.startswith("CONFIG:"):
+            try:
+                config_body = handshake.split("CONFIG:")[1]
+                parts = config_body.split(";")
+                obs_part = parts[0]  # e.g., "OBS=7"
+                act_part = parts[1]  # e.g., "ACT=6"
+                self.obs_shape = int(obs_part.split("=")[1])
+                self.act_shape = int(act_part.split("=")[1])
+                print(f"[GymWrapperBase] Handshake received: obs_shape = {self.obs_shape}, act_shape = {self.act_shape}")
+            except Exception as e:
+                print(f"[GymWrapperBase] Error parsing handshake: {e}")
+                self.disconnect()
+        else:
+            print("[GymWrapperBase] No valid handshake received; closing connection.")
+            self.disconnect()
+
+
     def disconnect(self):
         """
         Close the TCP connection.
@@ -32,7 +58,7 @@ class GymWrapperBase:
 
     def close(self):
         """
-        Shuts down the training enviornment.
+        Shuts down the training environment.
         """
         # add more enviornment shutdown stuff here in the future
         self.disconnect()
