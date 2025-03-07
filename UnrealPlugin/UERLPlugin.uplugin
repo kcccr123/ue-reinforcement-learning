@@ -5,6 +5,7 @@
   "FriendlyName": "UE RL Plugin",
   "Description": "Provides RL integration with Python-based RL frameworks.",
   "Category": "AI",
+  "CanContainContent": true,
   "Modules": [
     {
       "Name": "UERLPlugin",
