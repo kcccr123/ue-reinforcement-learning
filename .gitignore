@@ -5,4 +5,5 @@ Intermediate/
 *.exp
 *.gen.cpp
 
+.vscode
 __pycache__
