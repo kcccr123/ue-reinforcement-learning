@@ -3,9 +3,9 @@ import gymnasium as gym
 from gymnasium import spaces
 from .gym_wrapper_base import GymWrapperBase
 
-class GymWrapperPawn(gym.Env, GymWrapperBase):
+class GymWrapperGeneral(gym.Env, GymWrapperBase):
     """
-    A Gym environment implementation for controlling a single pawn in Unreal.
+    A dynamic Gym environment implementation for general use.
     Inherits TCP logic from GymWrapperBase and the Gym Env interface from gym.Env.
     """
     def __init__(self, ip='127.0.0.1', port=7777):
@@ -46,10 +46,7 @@ class GymWrapperPawn(gym.Env, GymWrapperBase):
         # Receive new state
         data = self.receive_data()
         obs, reward, done = self.parse_state(data)
-        
-        # obs mapping:
-        # 0 -> position
-        # 1 -> quat
+
         
         info = {}
         
@@ -58,30 +55,48 @@ class GymWrapperPawn(gym.Env, GymWrapperBase):
     
     def parse_state(self, data: str) -> tuple:
         """
-        Parse the state string from Unreal.
-        Expected format: "x,y,z;qw,qx,qy,qz;reward;done"
+        Dynamically parse the state string from Unreal.
+        The state string is expected to be semicolon separated. The last two values are
+        interpreted as reward and done respectively, while all preceding numbers form the observation.
+        
+        For example, a state string might look like:
+        "1.0,2.0,3.0,0.0,0.0,0.0,1.0;10.0;1"
+        which would parse into:
+        obs = [1.0,2.0,3.0,0.0,0.0,0.0,1.0] (as a numpy array),
+        reward = 10.0,
+        done = True
         """
         try:
+            # Split the state string by semicolons
             parts = data.split(";")
-            # pos_str => "x,y,z"
-            pos_str = parts[0]
-            # quat_str => "qw,qx,qy,qz"
-            quat_str = parts[1]
-            # reward
-            reward_str = parts[2]
-            # done or not
-            done_str = parts[3]
+            parsed_values = []
             
-            # Parse floats
-            pos = [float(v) for v in pos_str.split(",")]
-            quat = [float(v) for v in quat_str.split(",")]
-            reward = float(reward_str)
-            done = bool(int(done_str))
-            # Combine into a single array
-            obs = np.array(pos + quat, dtype=np.float32)
+            # Iterate over all parts and split by comma if applicable.
+            for part in parts:
+                # Remove any extraneous whitespace
+                part = part.strip()
+                if ',' in part:
+                    # Extend the list with each parsed float value
+                    parsed_values.extend([float(x) for x in part.split(",") if x.strip() != ""])
+                else:
+                    # Try to parse a single float value (could be reward or done flag)
+                    parsed_values.append(float(part))
+            
+            # Ensure we have at least three numbers (obs + reward + done)
+            if len(parsed_values) < 3:
+                raise ValueError("Not enough data in state string.")
+
+            # Assume that the last two values are reward and done.
+            done_value = int(parsed_values.pop())  # Remove and convert last element to int then bool
+            reward = parsed_values.pop()  # Remove reward
+            
+            # Convert the remaining values to a numpy array for the observation.
+            obs = np.array(parsed_values, dtype=np.float32)
+            done = bool(done_value)
+            
             return obs, reward, done
+
         except Exception as e:
             print("[GymWrapperPawn] Error parsing state:", e)
-            # Return a default tuple (observation, reward, done)
             default_obs = np.zeros(self.observation_space.shape, dtype=np.float32)
             return default_obs, 0.0, True

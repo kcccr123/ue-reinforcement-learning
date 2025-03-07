@@ -6,18 +6,25 @@
 #include "HAL/PlatformProcess.h"
 
 
-void URLBaseBridge::InitializeBridge()
+void URLBaseBridge::InitializeBridge_Implementation()
 {
-    UE_LOG(LogTemp, Error, TEXT("Bridge Initialized."));
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Initializing Bridge"));
 }
 
-bool URLBaseBridge::Connect(const FString& IPAddress, int32 Port)
+bool URLBaseBridge::Connect(const FString& IPAddress, int32 port, int32 actionSpaceSize, int32 obsSpaceSize)
 {
+    // Optionally, store the sizes in member variables if needed for handshake.
+    // For this example, we'll pass them directly in the handshake.
     CurrentIP = IPAddress;
-    CurrentPort = Port;
-    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Starting TCP server on %s:%d"), *IPAddress, Port);
+    CurrentPort = port;
+    ActionSpaceSize = actionSpaceSize;
+    ObservationSpaceSize = obsSpaceSize;
 
-    // Get the socket subsystem
+    InitializeBridge();
+        
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Starting TCP server on %s:%d"), *IPAddress, port);
+
+    // Get the socket subsystem.
     ISocketSubsystem* SocketSubsystem = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
     if (!SocketSubsystem)
     {
@@ -29,17 +36,17 @@ bool URLBaseBridge::Connect(const FString& IPAddress, int32 Port)
     ConnectionSocket = FTcpSocketBuilder(TEXT("RL_TcpServer"))
         .AsReusable()
         .BoundToAddress(FIPv4Address::Any)
-        .BoundToPort(Port)
-        .Listening(8); // Allow up to 8 pending connections
+        .BoundToPort(port)
+        .Listening(1);
     if (!ConnectionSocket)
     {
         UE_LOG(LogTemp, Error, TEXT("RLBaseBridge: Failed to create listening socket."));
         return false;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Listening on port %d"), Port);
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Listening on port %d"), port);
 
-    // Wait for an incoming connection by checking the value of bHasPendingConnection.
+    // Wait for an incoming connection.
     bool bHasPendingConnection = false;
     while (!bHasPendingConnection)
     {
@@ -56,16 +63,36 @@ bool URLBaseBridge::Connect(const FString& IPAddress, int32 Port)
         return false;
     }
 
-    // Destroy the listening socket and use the accepted client socket.
+    // Close the listening socket and replace it with the accepted client socket.
     ConnectionSocket->Close();
     SocketSubsystem->DestroySocket(ConnectionSocket);
     ConnectionSocket = ClientSocket;
 
     UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Accepted connection"));
+
+
+
+    // send the handshake to the Python environment 
+    SendHandshake();
+
     return true;
 }
 
 
+void URLBaseBridge::SendHandshake_Implementation()
+{
+    FString HandshakeMessage = FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d"), ObservationSpaceSize, ActionSpaceSize);
+
+    bool bSent = SendData(HandshakeMessage);
+    if (bSent)
+    {
+        UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Handshake sent: %s"), *HandshakeMessage);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("RLBaseBridge: Failed to send handshake."));
+    }
+}
 
 void URLBaseBridge::Disconnect()
 {
@@ -78,9 +105,48 @@ void URLBaseBridge::Disconnect()
     }
 }
 
+void URLBaseBridge::StartTraining()
+{
+    bIsTraining = true;
+}
+
 void URLBaseBridge::UpdateRL(float DeltaTime)
 {
-    UE_LOG(LogTemp, Error, TEXT("Updaing"));
+    UE_LOG(LogTemp, Log, TEXT("Updaing"));
+    // ---------------------- MAKE STATE STRING ---------------------------------
+    bool bDone = false;
+    float Reward = CalculateReward(bDone);
+    int32 DoneInt = bDone ? 1 : 0;
+
+    // Combine both into one state string (using a delimiter, e.g., semicolon)
+    FString DataToSend = FString::Printf(TEXT("%s%.2f;%d"), *CreateStateString(), Reward, DoneInt);
+
+    // ---------------------- MAKE STATE STRING ---------------------------------
+    // send data
+    SendData(DataToSend);
+
+    // recieve response
+    FString ActionResponse = ReceiveData();
+    if (!ActionResponse.IsEmpty())
+    {
+        if (ActionResponse.Equals("RESET"))
+        {
+            // reset if simulation is done
+            HandleReset();
+            return;
+        }
+
+        if (ActionResponse.Equals("TRAINING_COMPLETE"))
+        {
+            // reset if simulation is done
+            HandleReset();
+            Disconnect();
+            return;
+        }
+        // interpret response and apply given actions
+        HandleResponseActions(ActionResponse);
+    }
+
 }
 
 bool URLBaseBridge::SendData(const FString& Data)
@@ -91,8 +157,11 @@ bool URLBaseBridge::SendData(const FString& Data)
         return false;
     }
 
+    // Append the "STEP" delimiter to the message.
+    FString DataWithDelimiter = Data + TEXT("STEP");
+
     // Convert FString to UTF-8
-    FTCHARToUTF8 Converter(*Data);
+    FTCHARToUTF8 Converter(*DataWithDelimiter);
     int32 BytesToSend = Converter.Length();
     int32 BytesSent = 0;
 
@@ -103,7 +172,7 @@ bool URLBaseBridge::SendData(const FString& Data)
         return false;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Sent data -> %s"), *Data);
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Sent data -> %s"), *DataWithDelimiter);
     return true;
 }
 
@@ -159,11 +228,16 @@ void URLBaseBridge::HandleResponseActions_Implementation(const FString& actions)
 
 void URLBaseBridge::Tick(float DeltaTime)
 {
-    if (ConnectionSocket)
-    {
-        UpdateRL(DeltaTime);
-    }
+    UpdateRL(DeltaTime);
 }
+
+bool URLBaseBridge::IsTickable() const
+{
+
+    return ConnectionSocket != nullptr && bIsTraining;
+}
+
+
 
 TStatId URLBaseBridge::GetStatId() const
 {
