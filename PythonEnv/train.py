@@ -26,7 +26,7 @@ LEARNING_RATE = 3e-4        # Learning rate for the RL algorithm
 GAMMA = 0.99                # Discount factor
 N_STEPS = 1024              # Batch size per update (PPO or On-Policy Algos)
 
-MODEL_NAME = "fighter_model"  # Filename prefix for saving the model
+MODEL_NAME = "model"  # Filename prefix for saving the model
 
 # ------------------------------------------------------ #
 
