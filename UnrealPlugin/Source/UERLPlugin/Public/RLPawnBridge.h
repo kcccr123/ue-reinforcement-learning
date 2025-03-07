@@ -6,7 +6,7 @@
 #include "RLPawnBridge.generated.h"
 
 /**
- * Implementation example
+ * Implementation example of RLBaseBridge
  * Specialized RL bridge for controlling a single pawn (e.g., a StarFighter).
  */
 UCLASS(Blueprintable)

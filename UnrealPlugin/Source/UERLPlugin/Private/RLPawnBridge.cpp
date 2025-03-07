@@ -17,7 +17,7 @@ void URLPawnBridge::SetControlledPawn(APawn* InPawn)
 
 void URLPawnBridge::UpdateRL(float DeltaTime)
 {
-    // should have a default definition of UpdateRL in the base class.
+    // custom implementation of UpdateRL example
 
     if (!ControlledPawn)
     {
@@ -33,7 +33,7 @@ void URLPawnBridge::UpdateRL(float DeltaTime)
 
     // ---------------------- MAKE STATE STRING ---------------------------------
 
-    // this entire section should also be converted to a blueprint native function in the future
+    // this entire section could also be converted to a blueprint native function
     // user defined function that outputs a string of data to be sent to external python wrapper.
 
     // get pawn state
@@ -89,7 +89,7 @@ float URLPawnBridge::CalculateReward_Implementation(bool& bDone)
 
     // ------- Movement Training -------------
     // Target location
-    // This will teach model to only move to 100 100 100 each time. 
+    // This will teach model to only move to 1000 1000 1000 in world space each time. 
     // Need to pass commands through observation state for dynamic movement
     FVector Target(1000.f, 1000.f, 1000.f);
     float Dist = FVector::Dist(ControlledPawn->GetActorLocation(), Target);
@@ -106,7 +106,7 @@ float URLPawnBridge::CalculateReward_Implementation(bool& bDone)
 
 
     // reset simulaton if 180 frames have passed
-    if (passes >= 1048) {
+    if (passes >= 1024) {
         bDone = true;
     }
 
