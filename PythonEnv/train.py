@@ -22,7 +22,7 @@ ENV_IP = "127.0.0.1"        # IP address of the Unreal TCP server
 ENV_PORT = 7777             # Port for the Unreal TCP server
 
 TOTAL_TIMESTEPS = 100000    # How long we train
-LEARNING_RATE = 3e-4        # Learning rate for the RL algorithm
+LEARNING_RATE = 1e-3        # Learning rate for the RL algorithm
 GAMMA = 0.99                # Discount factor
 N_STEPS = 1024              # Batch size per update (PPO or On-Policy Algos)
 

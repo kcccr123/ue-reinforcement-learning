@@ -1,51 +1,64 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/NoExportTypes.h"
-#include "Tickable.h"
-#include "RLBaseBridge.generated.h"
+#include "GameFramework/Actor.h"
+#include "Sockets.h"
+#include "RLBaseBridgeActor.generated.h"
 
 /**
  * Base class for RL communication using TCP.
  * This class provides a framework for setting up your RL environment in Unreal Engine.
  * It includes default implementations for connecting and disconnecting via TCP.
+ * Allows tick group to be audjusted unlike UObject implementation of RL Bridge.
  */
-UCLASS(Abstract, Blueprintable)
-class UERLPLUGIN_API URLBaseBridge : public UObject, public FTickableGameObject
+UCLASS(Abstract)
+class UERLPLUGIN_API ARLBaseBridgeActor : public AActor
 {
     GENERATED_BODY()
 
-//---------------------------------------------------------
-// Functions for general RL communication
-//---------------------------------------------------------
+    //---------------------------------------------------------
+    // Functions for general RL communication
+    //---------------------------------------------------------
 public:
-    // Initialization function that can be implemented for special behavior in derived classes
-    // Called at the start of Connect()
-    // Intended to be used for setting up values for TCP handshake
+    /**
+     * Initialization function that can be implemented for special behavior in derived classes
+     * Called at the start of Connect()
+     * Intended to be used for setting up values for TCP handshake
+     */
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge")
     void InitializeBridge();
     virtual void InitializeBridge_Implementation();
 
-    // Sends TCP handshake to python environment.
-    // Called once connection is made; sends any information the python environment needs before training starts.
-    // If overriden, user needs to make sure to send action and observation space size in handshake.
+    /**
+     * Sends TCP handshake to python environment.
+     * Called once connection is made; sends any information the python environment needs before training starts.
+     * If overriden, user needs to make sure to send action and observation space size in handshake.
+     */
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge")
     void SendHandshake();
     virtual void SendHandshake_Implementation();
 
-    // Connect to TCP socket, passing IP, port, and desired sizes for action and observation spaces.
+    /**
+     * Connect to TCP socket, passing IP, port, and desired sizes for action and observation spaces.
+     */
     UFUNCTION(BlueprintCallable, Category = "RLBridge")
     virtual bool Connect(const FString& IPAddress, int32 port, int32 actionSpaceSize, int32 obsSpaceSize);
 
-    // Disconnect from TCP.
+    /**
+     * Disconnect from TCP.
+     */
     UFUNCTION(BlueprintCallable, Category = "RLBridge")
     virtual void Disconnect();
 
-    // Starts training; user calls this after environment is initialized.
+    /**
+     * Starts training; user calls this after environment is initialized.
+     */
     UFUNCTION(BlueprintCallable, Category = "RLBridge")
     virtual void StartTraining();
 
-    // Update loop for RL. Implemented by derived classes. Should be called every tick.
+    /**
+     * Update loop for RL. Implemented by derived classes. Should be called every tick.
+     */
     UFUNCTION(BlueprintCallable, Category = "RLBridge")
     virtual void UpdateRL(float DeltaTime);
 
@@ -71,29 +84,36 @@ protected:
     virtual bool SendData(const FString& Data);
     virtual FString ReceiveData();
 
-
-//---------------------------------------------------------
-// Required Environment Overrides
-// (Functions the user must implement for custom environment logic)
-//---------------------------------------------------------
+    //---------------------------------------------------------
+    // Required Environment Overrides
+    // (Functions the user must implement for custom environment logic)
+    //---------------------------------------------------------
 public:
-    // Calculate reward based on the environment state.
-    // Must set 'bDone' to true if the episode should end.
+    /**
+     * Calculate reward based on the environment state.
+     * Must set 'bDone' to true if the episode should end.
+     */
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge|Environment")
     float CalculateReward(bool& bDone);
     virtual float CalculateReward_Implementation(bool& bDone);
 
-    // Create a state string that packs observation data to send to the RL model.
+    /**
+     * Create a state string that packs observation data to send to the RL model.
+     */
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge|Environment")
     FString CreateStateString();
     virtual FString CreateStateString_Implementation();
 
-    // Handle a "RESET" command from the RL model to reset the simulation.
+    /**
+     * Handle a "RESET" command from the RL model to reset the simulation.
+     */
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge|Environment")
     void HandleReset();
     virtual void HandleReset_Implementation();
 
-    // Process received actions from the RL model and apply them to the environment.
+    /**
+     * Process received actions from the RL model and apply them to the environment.
+     */
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge|Environment")
     void HandleResponseActions(const FString& actions);
     virtual void HandleResponseActions_Implementation(const FString& actions);
@@ -106,22 +126,18 @@ public:
     bool IsActionRunning();
     virtual bool IsActionRunning_Implementation();
 
-//---------------------------------------------------------
-// FTickableGameObject Interface:
-//---------------------------------------------------------
+    //---------------------------------------------------------
+    // AActor overrides
+    //---------------------------------------------------------
 public:
-    // Called every frame by the engine.
+    // Sets default values for this actor's properties
+    ARLBaseBridgeActor();
+
+    // Called when the game starts or when spawned
+    virtual void BeginPlay() override;
+
+    /**
+    * By default tick occurs as part of post physics. Can be overriden.
+    */
     virtual void Tick(float DeltaTime) override;
-
-    // Return true so that this object is tickable.
-    virtual bool IsTickable() const override;
-
-    // Return false to disable ticking when the game is paused.
-    virtual bool IsTickableWhenPaused() const override { return false; }
-
-    // Specifies that this object should always tick.
-    virtual ETickableTickType GetTickableTickType() const override { return ETickableTickType::Always; }
-
-    // Returns a stat ID for profiling purposes.
-    virtual TStatId GetStatId() const override;
 };
