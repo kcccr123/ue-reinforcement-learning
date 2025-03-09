@@ -1,34 +1,53 @@
-#include "RLBaseBridge.h"
-#include "Sockets.h"
+#include "RLBaseBridgeActor.h"
 #include "SocketSubsystem.h"
 #include "Interfaces/IPv4/IPv4Address.h"
 #include "Common/TcpSocketBuilder.h"
 #include "HAL/PlatformProcess.h"
 
-
-void URLBaseBridge::InitializeBridge_Implementation()
+ARLBaseBridgeActor::ARLBaseBridgeActor()
 {
-    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Initializing Bridge"));
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.TickGroup = TG_PostPhysics;
 }
 
-bool URLBaseBridge::Connect(const FString& IPAddress, int32 port, int32 actionSpaceSize, int32 obsSpaceSize)
+void ARLBaseBridgeActor::BeginPlay()
 {
-    // Optionally, store the sizes in member variables if needed for handshake.
-    // For this example, we'll pass them directly in the handshake.
+    Super::BeginPlay();
+}
+
+void ARLBaseBridgeActor::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    if (bIsTraining)
+    {
+        UpdateRL(DeltaTime);
+    }
+}
+
+//---------------------------------------------------------
+// Functions for general RL communication
+//---------------------------------------------------------
+void ARLBaseBridgeActor::InitializeBridge_Implementation()
+{
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridgeActor: Initializing Bridge"));
+}
+
+bool ARLBaseBridgeActor::Connect(const FString& IPAddress, int32 port, int32 actionSpaceSize, int32 obsSpaceSize)
+{
     CurrentIP = IPAddress;
     CurrentPort = port;
     ActionSpaceSize = actionSpaceSize;
     ObservationSpaceSize = obsSpaceSize;
 
     InitializeBridge();
-        
-    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Starting TCP server on %s:%d"), *IPAddress, port);
 
-    // Get the socket subsystem.
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridgeActor: Starting TCP server on %s:%d"), *IPAddress, port);
+
     ISocketSubsystem* SocketSubsystem = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
     if (!SocketSubsystem)
     {
-        UE_LOG(LogTemp, Error, TEXT("RLBaseBridge: Socket subsystem not found!"));
+        UE_LOG(LogTemp, Error, TEXT("RLBaseBridgeActor: Socket subsystem not found!"));
         return false;
     }
 
@@ -38,13 +57,14 @@ bool URLBaseBridge::Connect(const FString& IPAddress, int32 port, int32 actionSp
         .BoundToAddress(FIPv4Address::Any)
         .BoundToPort(port)
         .Listening(1);
+
     if (!ConnectionSocket)
     {
-        UE_LOG(LogTemp, Error, TEXT("RLBaseBridge: Failed to create listening socket."));
+        UE_LOG(LogTemp, Error, TEXT("RLBaseBridgeActor: Failed to create listening socket."));
         return false;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Listening on port %d"), port);
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridgeActor: Listening on port %d"), port);
 
     // Wait for an incoming connection.
     bool bHasPendingConnection = false;
@@ -59,7 +79,7 @@ bool URLBaseBridge::Connect(const FString& IPAddress, int32 port, int32 actionSp
     FSocket* ClientSocket = ConnectionSocket->Accept(*RemoteAddress, TEXT("RL_ClientSocket"));
     if (!ClientSocket)
     {
-        UE_LOG(LogTemp, Error, TEXT("RLBaseBridge: Failed to accept connection."));
+        UE_LOG(LogTemp, Error, TEXT("RLBaseBridgeActor: Failed to accept connection."));
         return false;
     }
 
@@ -68,9 +88,7 @@ bool URLBaseBridge::Connect(const FString& IPAddress, int32 port, int32 actionSp
     SocketSubsystem->DestroySocket(ConnectionSocket);
     ConnectionSocket = ClientSocket;
 
-    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Accepted connection"));
-
-
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridgeActor: Accepted connection"));
 
     // send the handshake to the Python environment 
     SendHandshake();
@@ -78,42 +96,46 @@ bool URLBaseBridge::Connect(const FString& IPAddress, int32 port, int32 actionSp
     return true;
 }
 
-
-void URLBaseBridge::SendHandshake_Implementation()
+void ARLBaseBridgeActor::SendHandshake_Implementation()
 {
     FString HandshakeMessage = FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d"), ObservationSpaceSize, ActionSpaceSize);
 
     bool bSent = SendData(HandshakeMessage);
     if (bSent)
     {
-        UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Handshake sent: %s"), *HandshakeMessage);
+        UE_LOG(LogTemp, Log, TEXT("RLBaseBridgeActor: Handshake sent: %s"), *HandshakeMessage);
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("RLBaseBridge: Failed to send handshake."));
+        UE_LOG(LogTemp, Warning, TEXT("RLBaseBridgeActor: Failed to send handshake."));
     }
 }
 
-void URLBaseBridge::Disconnect()
+void ARLBaseBridgeActor::Disconnect()
 {
     if (ConnectionSocket)
     {
-        UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Disconnecting."));
+        UE_LOG(LogTemp, Log, TEXT("RLBaseBridgeActor: Disconnecting."));
         ConnectionSocket->Close();
         ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(ConnectionSocket);
         ConnectionSocket = nullptr;
     }
 }
 
-void URLBaseBridge::StartTraining()
+void ARLBaseBridgeActor::StartTraining()
 {
     bIsTraining = true;
 }
 
-void URLBaseBridge::UpdateRL(float DeltaTime)
+//---------------------------------------------------------
+// Update Loop
+//---------------------------------------------------------
+void ARLBaseBridgeActor::UpdateRL(float DeltaTime)
 {
-    UE_LOG(LogTemp, Log, TEXT("Updaing"));
-    if (!bIsWaitingForAction) {
+    UE_LOG(LogTemp, Log, TEXT("Updaing")); // same message as old code
+
+    if (!bIsWaitingForAction)
+    {
         // ---------------------- MAKE STATE STRING ---------------------------------
         bool bDone = false;
         float Reward = CalculateReward(bDone);
@@ -126,7 +148,7 @@ void URLBaseBridge::UpdateRL(float DeltaTime)
         // send data
         SendData(DataToSend);
 
-        // recieve response
+        // receive response
         FString ActionResponse = ReceiveData();
         if (!ActionResponse.IsEmpty())
         {
@@ -147,21 +169,23 @@ void URLBaseBridge::UpdateRL(float DeltaTime)
             // interpret response and apply given actions
             HandleResponseActions(ActionResponse);
             bIsWaitingForAction = true;
-
         }
     }
-    else {
+    else
+    {
+        // Wait if the character is still moving
         bIsWaitingForAction = IsActionRunning();
     }
-    
-
 }
 
-bool URLBaseBridge::SendData(const FString& Data)
+//---------------------------------------------------------
+// Default TCP send/recv
+//---------------------------------------------------------
+bool ARLBaseBridgeActor::SendData(const FString& Data)
 {
     if (!ConnectionSocket)
     {
-        UE_LOG(LogTemp, Error, TEXT("RLBaseBridge: No connection socket available for sending."));
+        UE_LOG(LogTemp, Error, TEXT("RLBaseBridgeActor: No connection socket available for sending."));
         return false;
     }
 
@@ -176,19 +200,19 @@ bool URLBaseBridge::SendData(const FString& Data)
     bool bSuccess = ConnectionSocket->Send(reinterpret_cast<const uint8*>(Converter.Get()), BytesToSend, BytesSent);
     if (!bSuccess || BytesSent <= 0)
     {
-        UE_LOG(LogTemp, Warning, TEXT("RLBaseBridge: Failed to send data."));
+        UE_LOG(LogTemp, Warning, TEXT("RLBaseBridgeActor: Failed to send data."));
         return false;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Sent data -> %s"), *DataWithDelimiter);
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridgeActor: Sent data -> %s"), *DataWithDelimiter);
     return true;
 }
 
-FString URLBaseBridge::ReceiveData()
+FString ARLBaseBridgeActor::ReceiveData()
 {
     if (!ConnectionSocket)
     {
-        UE_LOG(LogTemp, Error, TEXT("RLBaseBridge: No connection socket available for receiving."));
+        UE_LOG(LogTemp, Error, TEXT("RLBaseBridgeActor: No connection socket available for receiving."));
         return TEXT("");
     }
 
@@ -206,53 +230,36 @@ FString URLBaseBridge::ReceiveData()
 
     // Convert received bytes back to FString (assuming UTF-8)
     FString ReceivedString = FString(UTF8_TO_TCHAR(reinterpret_cast<const char*>(DataBuffer)));
-    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Received data -> %s"), *ReceivedString);
+    UE_LOG(LogTemp, Log, TEXT("RLBaseBridgeActor: Received data -> %s"), *ReceivedString);
     return ReceivedString;
 }
 
-
-float URLBaseBridge::CalculateReward_Implementation(bool& bDone)
+//---------------------------------------------------------
+// Required Environment Overrides
+//---------------------------------------------------------
+float ARLBaseBridgeActor::CalculateReward_Implementation(bool& bDone)
 {
     // Default is zero reward, not done
     bDone = false;
     return 0.0f;
 }
 
-FString URLBaseBridge::CreateStateString_Implementation()
+FString ARLBaseBridgeActor::CreateStateString_Implementation()
 {
     return FString();
 }
 
-void URLBaseBridge::HandleReset_Implementation()
+void ARLBaseBridgeActor::HandleReset_Implementation()
 {
     // Default empty implementation.
 }
 
-void URLBaseBridge::HandleResponseActions_Implementation(const FString& actions)
+void ARLBaseBridgeActor::HandleResponseActions_Implementation(const FString& actions)
 {
     // Default empty implementation.
 }
 
-
-bool URLBaseBridge::IsActionRunning_Implementation()
+bool ARLBaseBridgeActor::IsActionRunning_Implementation()
 {
     return false;
-}
-
-void URLBaseBridge::Tick(float DeltaTime)
-{
-    UpdateRL(DeltaTime);
-}
-
-bool URLBaseBridge::IsTickable() const
-{
-
-    return ConnectionSocket != nullptr && bIsTraining;
-}
-
-
-
-TStatId URLBaseBridge::GetStatId() const
-{
-    RETURN_QUICK_DECLARE_CYCLE_STAT(URLBaseBridge, STATGROUP_Tickables);
 }
