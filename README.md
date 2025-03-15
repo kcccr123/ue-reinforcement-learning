@@ -6,7 +6,7 @@
   </a>
 -->
 
-<h3 align="center">Unreal Engine Reinforcement Learning Library</h3>
+<h3 align="center">Unreal Engine Deep Reinforcement Learning Library</h3>
 
   <p align="center">
     Library and plugin for streamlined development of learning agents in Unreal Engine 5
