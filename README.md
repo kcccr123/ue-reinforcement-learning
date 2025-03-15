@@ -38,7 +38,7 @@
 
 ## About The Project
 
-Reinforcement learning framework designed specifically for integration with Unreal Engine.
+Deep reinforcement learning framework designed specifically for integration with Unreal Engine.
 
 Made for both developers and non-programmers, the library supports native code alongside Blueprint visual scripting, enabling users to implement learning agents within their Unreal projects regardless of their programming background.
 
