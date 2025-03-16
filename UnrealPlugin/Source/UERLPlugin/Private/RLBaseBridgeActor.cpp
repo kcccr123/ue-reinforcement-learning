@@ -132,7 +132,7 @@ void ARLBaseBridgeActor::StartTraining()
 //---------------------------------------------------------
 void ARLBaseBridgeActor::UpdateRL(float DeltaTime)
 {
-    UE_LOG(LogTemp, Log, TEXT("Updaing")); // same message as old code
+    UE_LOG(LogTemp, Log, TEXT("Updaing"));
 
     if (!bIsWaitingForAction)
     {
