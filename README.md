@@ -51,6 +51,7 @@ The framework features a minimal setup process to get you started fast. Its desi
 ![Unreal Engine](https://img.shields.io/badge/Unreal%20Engine-0E1128?logo=unrealengine&logoColor=fff&style=for-the-badge)
 ![C++](https://img.shields.io/badge/C%2B%2B-00599C?logo=cplusplus&logoColor=fff&style=for-the-badge)
 ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
+![ONNX](https://img.shields.io/badge/ONNX-005CED?logo=onnx&logoColor=fff&style=for-the-badge)
 
 <!-- INSTALLATION -->
 
