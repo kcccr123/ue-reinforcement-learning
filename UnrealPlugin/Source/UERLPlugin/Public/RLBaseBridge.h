@@ -63,6 +63,9 @@ protected:
     // Flag indicating whether we should send observation state or wait for current action to complete
     bool bIsWaitingForAction = false;
 
+    // Flag indicating if waiting for python response from sending an action
+    bool bIsWaitingForPythonResp = false;
+
     // Action space and observation space size
     int32 ActionSpaceSize = 0;
     int32 ObservationSpaceSize = 0;

@@ -136,17 +136,21 @@ void ARLBaseBridgeActor::UpdateRL(float DeltaTime)
 
     if (!bIsWaitingForAction)
     {
-        // ---------------------- MAKE STATE STRING ---------------------------------
-        bool bDone = false;
-        float Reward = CalculateReward(bDone);
-        int32 DoneInt = bDone ? 1 : 0;
+        if (!bIsWaitingForPythonResp) {
+            // ---------------------- MAKE STATE STRING ---------------------------------
+            bool bDone = false;
+            float Reward = CalculateReward(bDone);
+            int32 DoneInt = bDone ? 1 : 0;
 
-        // Combine both into one state string (using a delimiter, e.g., semicolon)
-        FString DataToSend = FString::Printf(TEXT("%s%.2f;%d"), *CreateStateString(), Reward, DoneInt);
+            // Combine both into one state string (using a delimiter, e.g., semicolon)
+            FString DataToSend = FString::Printf(TEXT("%s%.2f;%d"), *CreateStateString(), Reward, DoneInt);
 
-        // ---------------------- MAKE STATE STRING ---------------------------------
-        // send data
-        SendData(DataToSend);
+            // ---------------------- MAKE STATE STRING ---------------------------------
+            // send data
+            SendData(DataToSend);
+            bIsWaitingForPythonResp = true;
+        }
+        
 
         // receive response
         FString ActionResponse = ReceiveData();
@@ -169,6 +173,10 @@ void ARLBaseBridgeActor::UpdateRL(float DeltaTime)
             // interpret response and apply given actions
             HandleResponseActions(ActionResponse);
             bIsWaitingForAction = true;
+            bIsWaitingForPythonResp = false;
+        }
+        else {
+            bIsWaitingForPythonResp = true;
         }
     }
     else
