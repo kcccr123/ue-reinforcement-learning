@@ -26,6 +26,21 @@ public:
     static TArray<float> ParseActionString(const FString& ActionString);
 
     /**
+     * Splits a string by semicolon first, then for each chunk, splits by comma.
+     * All parsed numeric values are returned in a single float array.
+     *
+     * Example:
+     *   "1.0,2.0,3.0;10.0;4.0,5.0"
+     *   => [1.0, 2.0, 3.0, 10.0, 4.0, 5.0]
+     *
+     * @param MixedString The string containing multiple segments separated by ";"
+     *                    and optionally comma-delimited floats within each segment.
+     * @return A flat array of all parsed float values.
+     */
+    UFUNCTION(BlueprintCallable, Category = "DataHelpers")
+    static TArray<float> ParseStateString(const FString& MixedString);
+
+    /**
      * Appends a new string value to an existing state string using ";" as the delimiter.
      * If BaseState is empty, returns NewValue.
      *

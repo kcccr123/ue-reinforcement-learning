@@ -16,6 +16,49 @@ TArray<float> UBPFL_DataHelpers::ParseActionString(const FString& ActionString)
     return OutValues;
 }
 
+TArray<float> UBPFL_DataHelpers::ParseStateString(const FString& MixedString)
+{
+    TArray<float> OutValues;
+
+    // 1) Split by semicolon
+    TArray<FString> SemicolonParts;
+    MixedString.ParseIntoArray(SemicolonParts, TEXT(";"), true);
+
+    for (FString& Part : SemicolonParts)
+    {
+        Part.TrimStartAndEndInline();
+        if (Part.IsEmpty())
+        {
+            continue;
+        }
+
+        // 2) If there's a comma, parse multiple floats
+        if (Part.Contains(TEXT(",")))
+        {
+            TArray<FString> CommaParts;
+            Part.ParseIntoArray(CommaParts, TEXT(","), true);
+
+            for (FString& Sub : CommaParts)
+            {
+                Sub.TrimStartAndEndInline();
+                if (!Sub.IsEmpty())
+                {
+                    float Value = FCString::Atof(*Sub);
+                    OutValues.Add(Value);
+                }
+            }
+        }
+        else
+        {
+            // No comma => single float
+            float Value = FCString::Atof(*Part);
+            OutValues.Add(Value);
+        }
+    }
+
+    return OutValues;
+}
+
 FString UBPFL_DataHelpers::AppendToStateString(const FString& BaseState, const FString& NewValue)
 {
     return BaseState + NewValue + TEXT(";");
