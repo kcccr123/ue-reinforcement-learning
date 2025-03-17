@@ -45,9 +45,15 @@ public:
     UFUNCTION(BlueprintCallable, Category = "RLBridge")
     virtual void StartTraining();
 
-    // Update loop for RL. Implemented by derived classes. Should be called every tick.
+    // Called before or during inference mode: load your model. 
+    // Returns true if loaded succesfully
     UFUNCTION(BlueprintCallable, Category = "RLBridge")
-    virtual void UpdateRL(float DeltaTime);
+    bool LoadLocalModel(const FString& ModelPath);
+
+    // Starts training; user calls this after Inference model is initialized.
+    UFUNCTION(BlueprintCallable, Category = "RLBridge")
+    virtual void StartInference();
+
 
 protected:
     // Pointer to the TCP socket.
@@ -57,8 +63,14 @@ protected:
     FString CurrentIP;
     int32 CurrentPort;
 
+    // Pointer to local model
+    void* LocalModelHandle = nullptr;
+
     // Flag indicating whether the simulation/training is running.
     bool bIsTraining = false;
+
+    // Flag indicating if inference is running
+    bool bIsInference = false;
 
     // Flag indicating whether we should send observation state or wait for current action to complete
     bool bIsWaitingForAction = false;
@@ -69,6 +81,12 @@ protected:
     // Action space and observation space size
     int32 ActionSpaceSize = 0;
     int32 ObservationSpaceSize = 0;
+
+    // Run inference using loaded model
+    FString RunLocalModelInference(const FString& Observation);
+
+    // Update loop for RL. Implemented by derived classes. Should be called every tick.
+    virtual void UpdateRL(float DeltaTime);
 
     // Default implementations for sending and receiving data over TCP.
     virtual bool SendData(const FString& Data);

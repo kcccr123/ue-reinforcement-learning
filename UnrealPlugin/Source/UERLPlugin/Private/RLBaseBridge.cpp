@@ -5,7 +5,6 @@
 #include "Common/TcpSocketBuilder.h"
 #include "HAL/PlatformProcess.h"
 
-
 void URLBaseBridge::InitializeBridge_Implementation()
 {
     UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Initializing Bridge"));
@@ -108,6 +107,26 @@ void URLBaseBridge::Disconnect()
 void URLBaseBridge::StartTraining()
 {
     bIsTraining = true;
+    bIsInference = false;
+}
+
+bool URLBaseBridge::LoadLocalModel(const FString& ModelPath)
+{
+
+    return true;
+}
+
+
+void URLBaseBridge::StartInference()
+{
+    bIsTraining = false;
+    bIsInference = true;
+}
+
+
+FString URLBaseBridge::RunLocalModelInference(const FString& Observation)
+{
+    return FString();
 }
 
 void URLBaseBridge::UpdateRL(float DeltaTime)
@@ -116,48 +135,58 @@ void URLBaseBridge::UpdateRL(float DeltaTime)
 
     if (!bIsWaitingForAction)
     {
-        if (!bIsWaitingForPythonResp) {
-            // ---------------------- MAKE STATE STRING ---------------------------------
-            bool bDone = false;
-            float Reward = CalculateReward(bDone);
-            int32 DoneInt = bDone ? 1 : 0;
+        if (bIsTraining) {
+            if (!bIsWaitingForPythonResp) {
+                // ---------------------- MAKE STATE STRING ---------------------------------
+                bool bDone = false;
+                float Reward = CalculateReward(bDone);
+                int32 DoneInt = bDone ? 1 : 0;
 
-            // Combine both into one state string (using a delimiter, e.g., semicolon)
-            FString DataToSend = FString::Printf(TEXT("%s%.2f;%d"), *CreateStateString(), Reward, DoneInt);
+                // Combine both into one state string (using a delimiter, e.g., semicolon)
+                FString DataToSend = FString::Printf(TEXT("%s%.2f;%d"), *CreateStateString(), Reward, DoneInt);
 
-            // ---------------------- MAKE STATE STRING ---------------------------------
-            // send data
-            SendData(DataToSend);
-            bIsWaitingForPythonResp = true;
+                // ---------------------- MAKE STATE STRING ---------------------------------
+                // send data
+                SendData(DataToSend);
+                bIsWaitingForPythonResp = true;
+            }
+
+
+            // receive response
+            FString ActionResponse = ReceiveData();
+            if (!ActionResponse.IsEmpty())
+            {
+                if (ActionResponse.Equals("RESET"))
+                {
+                    // reset if simulation is done
+                    HandleReset();
+                    return;
+                }
+
+                if (ActionResponse.Equals("TRAINING_COMPLETE"))
+                {
+                    // reset if simulation is done
+                    HandleReset();
+                    Disconnect();
+                    return;
+                }
+                // interpret response and apply given actions
+                HandleResponseActions(ActionResponse);
+                bIsWaitingForAction = true;
+                bIsWaitingForPythonResp = false;
+            }
+            else {
+                bIsWaitingForPythonResp = true;
+            }
         }
-
-
-        // receive response
-        FString ActionResponse = ReceiveData();
-        if (!ActionResponse.IsEmpty())
-        {
-            if (ActionResponse.Equals("RESET"))
-            {
-                // reset if simulation is done
-                HandleReset();
-                return;
-            }
-
-            if (ActionResponse.Equals("TRAINING_COMPLETE"))
-            {
-                // reset if simulation is done
-                HandleReset();
-                Disconnect();
-                return;
-            }
-            // interpret response and apply given actions
+        if (bIsInference) {
+            // receive response
+            FString ActionResponse = RunLocalModelInference(CreateStateString());
             HandleResponseActions(ActionResponse);
             bIsWaitingForAction = true;
-            bIsWaitingForPythonResp = false;
+
         }
-        else {
-            bIsWaitingForPythonResp = true;
-        }
+       
     }
     else
     {
@@ -249,14 +278,16 @@ bool URLBaseBridge::IsActionRunning_Implementation()
 }
 
 void URLBaseBridge::Tick(float DeltaTime)
-{
+{ 
+    
     UpdateRL(DeltaTime);
+
 }
 
 bool URLBaseBridge::IsTickable() const
 {
 
-    return ConnectionSocket != nullptr && bIsTraining;
+    return (bIsTraining && ConnectionSocket) || bIsInference;
 }
 
 
