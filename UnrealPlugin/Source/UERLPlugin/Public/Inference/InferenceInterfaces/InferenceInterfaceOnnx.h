@@ -2,10 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "InferenceInterface.h"
-#include "InferenceInterfaceOnnx.generated.h"
-
 #include <onnxruntime_cxx_api.h>
 #include <memory>
+#include "InferenceInterfaceOnnx.generated.h"
 
 class Ort::Session;
 class Ort::Env;
