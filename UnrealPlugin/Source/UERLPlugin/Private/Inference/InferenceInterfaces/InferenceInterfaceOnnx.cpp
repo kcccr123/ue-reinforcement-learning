@@ -18,6 +18,7 @@ UInferenceInterfaceOnnx::UInferenceInterfaceOnnx()
 UInferenceInterfaceOnnx::~UInferenceInterfaceOnnx()
 {
 	// SessionPtr will automatically be cleaned up.
+	// add any logic for cleaning up Onnx logic here
 }
 
 bool UInferenceInterfaceOnnx::LoadModel(const FString& ModelPath)
@@ -64,6 +65,8 @@ FString UInferenceInterfaceOnnx::RunInference(const TArray<float>& Observation)
 	std::vector<float> InputData(Observation.GetData(), Observation.GetData() + Observation.Num());
 	// Assume the model expects an input shape of [1, N].
 	std::vector<int64_t> InputShape = { 1, static_cast<int64_t>(Observation.Num()) };
+
+	// NOTE: do we need to pass the observation space size here? or is it already baked into the model?
 
 	// Create an input tensor.
 	static Ort::MemoryInfo MemoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "Tickable.h"
+#include "Inference/InferenceInterfaces/InferenceInterface.h"
 #include "RLBaseBridge.generated.h"
 
 /**
@@ -63,8 +64,8 @@ protected:
     FString CurrentIP;
     int32 CurrentPort;
 
-    // Pointer to local model
-    void* LocalModelHandle = nullptr;
+    // Pointer to model interface
+    UInferenceInterface * InferenceInterface = nullptr;
 
     // Flag indicating whether the simulation/training is running.
     bool bIsTraining = false;

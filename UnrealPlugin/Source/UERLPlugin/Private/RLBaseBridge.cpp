@@ -112,7 +112,9 @@ void URLBaseBridge::StartTraining()
 
 bool URLBaseBridge::LoadLocalModel(const FString& ModelPath)
 {
-
+    // TODO
+    // CALL OUR INFERENCE INTERFACE
+    // REPLACE THIS WITH A SETINTERFACE FUNCTION
     return true;
 }
 
@@ -126,6 +128,8 @@ void URLBaseBridge::StartInference()
 
 FString URLBaseBridge::RunLocalModelInference(const FString& Observation)
 {
+    // TODO
+    // CALL OUR INFERENCE INTERFACE
     return FString();
 }
 
