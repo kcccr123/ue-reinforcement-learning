@@ -3,6 +3,7 @@
 #include "Interfaces/IPv4/IPv4Address.h"
 #include "Common/TcpSocketBuilder.h"
 #include "HAL/PlatformProcess.h"
+#include "UERLPlugin/Helpers/BPFL_DataHelpers.h"
 
 ARLBaseBridgeActor::ARLBaseBridgeActor()
 {
@@ -19,7 +20,7 @@ void ARLBaseBridgeActor::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
-    if (bIsTraining)
+    if ((bIsTraining || bIsInference) && ConnectionSocket)
     {
         UpdateRL(DeltaTime);
     }
@@ -51,7 +52,6 @@ bool ARLBaseBridgeActor::Connect(const FString& IPAddress, int32 port, int32 act
         return false;
     }
 
-    // Create a listening socket that binds to any address on the given port.
     ConnectionSocket = FTcpSocketBuilder(TEXT("RL_TcpServer"))
         .AsReusable()
         .BoundToAddress(FIPv4Address::Any)
@@ -66,7 +66,6 @@ bool ARLBaseBridgeActor::Connect(const FString& IPAddress, int32 port, int32 act
 
     UE_LOG(LogTemp, Log, TEXT("RLBaseBridgeActor: Listening on port %d"), port);
 
-    // Wait for an incoming connection.
     bool bHasPendingConnection = false;
     while (!bHasPendingConnection)
     {
@@ -74,7 +73,6 @@ bool ARLBaseBridgeActor::Connect(const FString& IPAddress, int32 port, int32 act
         FPlatformProcess::Sleep(0.1f);
     }
 
-    // Accept the incoming connection.
     TSharedRef<FInternetAddr> RemoteAddress = SocketSubsystem->CreateInternetAddr();
     FSocket* ClientSocket = ConnectionSocket->Accept(*RemoteAddress, TEXT("RL_ClientSocket"));
     if (!ClientSocket)
@@ -83,14 +81,12 @@ bool ARLBaseBridgeActor::Connect(const FString& IPAddress, int32 port, int32 act
         return false;
     }
 
-    // Close the listening socket and replace it with the accepted client socket.
     ConnectionSocket->Close();
     SocketSubsystem->DestroySocket(ConnectionSocket);
     ConnectionSocket = ClientSocket;
 
     UE_LOG(LogTemp, Log, TEXT("RLBaseBridgeActor: Accepted connection"));
 
-    // send the handshake to the Python environment 
     SendHandshake();
 
     return true;
@@ -125,6 +121,36 @@ void ARLBaseBridgeActor::Disconnect()
 void ARLBaseBridgeActor::StartTraining()
 {
     bIsTraining = true;
+    bIsInference = false;
+}
+
+bool ARLBaseBridgeActor::SetInferenceInterface(UInferenceInterface* Interface)
+{
+    if (Interface) {
+        InferenceInterface = Interface;
+        return true;
+    }
+    else {
+        UE_LOG(LogTemp, Warning, TEXT("RLBaseBridgeActor: Empty InferenceInterface ptr."));
+        return false;
+    }
+}
+
+void ARLBaseBridgeActor::StartInference()
+{
+    bIsTraining = false;
+    bIsInference = true;
+}
+
+FString ARLBaseBridgeActor::RunLocalModelInference(const FString& Observation)
+{
+    if (InferenceInterface) {
+        return InferenceInterface->RunInference(UBPFL_DataHelpers::ParseStateString(Observation));
+    }
+    else {
+        UE_LOG(LogTemp, Warning, TEXT("RLBaseBridgeActor: Empty InferenceInterface ptr."));
+        return "";
+    }
 }
 
 //---------------------------------------------------------
@@ -136,52 +162,51 @@ void ARLBaseBridgeActor::UpdateRL(float DeltaTime)
 
     if (!bIsWaitingForAction)
     {
-        if (!bIsWaitingForPythonResp) {
-            // ---------------------- MAKE STATE STRING ---------------------------------
-            bool bDone = false;
-            float Reward = CalculateReward(bDone);
-            int32 DoneInt = bDone ? 1 : 0;
-
-            // Combine both into one state string (using a delimiter, e.g., semicolon)
-            FString DataToSend = FString::Printf(TEXT("%s%.2f;%d"), *CreateStateString(), Reward, DoneInt);
-
-            // ---------------------- MAKE STATE STRING ---------------------------------
-            // send data
-            SendData(DataToSend);
-            bIsWaitingForPythonResp = true;
-        }
-        
-
-        // receive response
-        FString ActionResponse = ReceiveData();
-        if (!ActionResponse.IsEmpty())
-        {
-            if (ActionResponse.Equals("RESET"))
-            {
-                // reset if simulation is done
-                HandleReset();
-                return;
+        if (bIsTraining) {
+            if (!bIsWaitingForPythonResp) {
+                bool bDone = false;
+                float Reward = CalculateReward(bDone);
+                int32 DoneInt = bDone ? 1 : 0;
+                FString DataToSend = FString::Printf(TEXT("%s%.2f;%d"), *CreateStateString(), Reward, DoneInt);
+                SendData(DataToSend);
+                bIsWaitingForPythonResp = true;
             }
 
-            if (ActionResponse.Equals("TRAINING_COMPLETE"))
+            FString ActionResponse = ReceiveData();
+            if (!ActionResponse.IsEmpty())
             {
-                // reset if simulation is done
-                HandleReset();
-                Disconnect();
-                return;
+                if (ActionResponse.Equals("RESET"))
+                {
+                    HandleReset();
+                    return;
+                }
+
+                if (ActionResponse.Equals("TRAINING_COMPLETE"))
+                {
+                    HandleReset();
+                    Disconnect();
+                    return;
+                }
+
+                HandleResponseActions(ActionResponse);
+                bIsWaitingForAction = true;
+                bIsWaitingForPythonResp = false;
             }
-            // interpret response and apply given actions
-            HandleResponseActions(ActionResponse);
-            bIsWaitingForAction = true;
-            bIsWaitingForPythonResp = false;
+            else {
+                bIsWaitingForPythonResp = true;
+            }
         }
-        else {
-            bIsWaitingForPythonResp = true;
+
+        if (bIsInference) {
+            FString ActionResponse = RunLocalModelInference(CreateStateString());
+            if (!ActionResponse.IsEmpty()) {
+                HandleResponseActions(ActionResponse);
+                bIsWaitingForAction = true;
+            }
         }
     }
     else
     {
-        // Wait if the character is still moving
         bIsWaitingForAction = IsActionRunning();
     }
 }
@@ -197,10 +222,8 @@ bool ARLBaseBridgeActor::SendData(const FString& Data)
         return false;
     }
 
-    // Append the "STEP" delimiter to the message.
     FString DataWithDelimiter = Data + TEXT("STEP");
 
-    // Convert FString to UTF-8
     FTCHARToUTF8 Converter(*DataWithDelimiter);
     int32 BytesToSend = Converter.Length();
     int32 BytesSent = 0;
@@ -224,7 +247,6 @@ FString ARLBaseBridgeActor::ReceiveData()
         return TEXT("");
     }
 
-    // Buffer for receiving data
     uint8 DataBuffer[1024];
     FMemory::Memset(DataBuffer, 0, 1024);
     int32 BytesRead = 0;
@@ -232,11 +254,9 @@ FString ARLBaseBridgeActor::ReceiveData()
     bool bReceived = ConnectionSocket->Recv(DataBuffer, 1024, BytesRead);
     if (!bReceived || BytesRead <= 0)
     {
-        // If no data is received, return empty string
         return TEXT("");
     }
 
-    // Convert received bytes back to FString (assuming UTF-8)
     FString ReceivedString = FString(UTF8_TO_TCHAR(reinterpret_cast<const char*>(DataBuffer)));
     UE_LOG(LogTemp, Log, TEXT("RLBaseBridgeActor: Received data -> %s"), *ReceivedString);
     return ReceivedString;
@@ -247,7 +267,6 @@ FString ARLBaseBridgeActor::ReceiveData()
 //---------------------------------------------------------
 float ARLBaseBridgeActor::CalculateReward_Implementation(bool& bDone)
 {
-    // Default is zero reward, not done
     bDone = false;
     return 0.0f;
 }
@@ -259,12 +278,10 @@ FString ARLBaseBridgeActor::CreateStateString_Implementation()
 
 void ARLBaseBridgeActor::HandleReset_Implementation()
 {
-    // Default empty implementation.
 }
 
 void ARLBaseBridgeActor::HandleResponseActions_Implementation(const FString& actions)
 {
-    // Default empty implementation.
 }
 
 bool ARLBaseBridgeActor::IsActionRunning_Implementation()

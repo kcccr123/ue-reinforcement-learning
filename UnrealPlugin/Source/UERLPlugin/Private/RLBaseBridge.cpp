@@ -3,6 +3,7 @@
 #include "SocketSubsystem.h"
 #include "Interfaces/IPv4/IPv4Address.h"
 #include "Common/TcpSocketBuilder.h"
+#include "UERLPlugin/Helpers/BPFL_DataHelpers.h" 
 #include "HAL/PlatformProcess.h"
 
 void URLBaseBridge::InitializeBridge_Implementation()
@@ -110,12 +111,17 @@ void URLBaseBridge::StartTraining()
     bIsInference = false;
 }
 
-bool URLBaseBridge::LoadLocalModel(const FString& ModelPath)
+bool URLBaseBridge::SetInferenceInterface(UInferenceInterface* Interface)
 {
-    // TODO
-    // CALL OUR INFERENCE INTERFACE
-    // REPLACE THIS WITH A SETINTERFACE FUNCTION
-    return true;
+    if (Interface) {
+        InferenceInterface = Interface;
+        return true;
+    }
+    else {
+        UE_LOG(LogTemp, Warning, TEXT("RLBaseBridge: Empty InferenceInterface ptr."));
+        return false;
+    }
+    
 }
 
 
@@ -128,9 +134,14 @@ void URLBaseBridge::StartInference()
 
 FString URLBaseBridge::RunLocalModelInference(const FString& Observation)
 {
-    // TODO
-    // CALL OUR INFERENCE INTERFACE
-    return FString();
+    if (InferenceInterface) {
+        return InferenceInterface->RunInference(UBPFL_DataHelpers::ParseStateString(Observation));
+    }
+    else {
+        UE_LOG(LogTemp, Warning, TEXT("RLBaseBridge: Empty InferenceInterface ptr."));
+        return "";
+    }
+    
 }
 
 void URLBaseBridge::UpdateRL(float DeltaTime)
@@ -184,10 +195,13 @@ void URLBaseBridge::UpdateRL(float DeltaTime)
             }
         }
         if (bIsInference) {
-            // receive response
+            // if inference mode, run inference through loaded model instead
             FString ActionResponse = RunLocalModelInference(CreateStateString());
-            HandleResponseActions(ActionResponse);
-            bIsWaitingForAction = true;
+            if (!ActionResponse.IsEmpty()) {
+                HandleResponseActions(ActionResponse);
+                bIsWaitingForAction = true;
+            }
+            
 
         }
        

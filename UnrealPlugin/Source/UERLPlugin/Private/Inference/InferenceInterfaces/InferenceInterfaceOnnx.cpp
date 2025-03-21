@@ -1,6 +1,6 @@
 
 #include "Inference/InferenceInterfaces/InferenceInterfaceOnnx.h"
-#include "UERLPlugin/Helpers/BPFL_DataHelpers.h" .
+#include "UERLPlugin/Helpers/BPFL_DataHelpers.h" 
 #include "Misc/Paths.h"
 #include "HAL/PlatformFilemanager.h"
 
@@ -17,13 +17,12 @@ UInferenceInterfaceOnnx::UInferenceInterfaceOnnx()
 
 UInferenceInterfaceOnnx::~UInferenceInterfaceOnnx()
 {
-	// SessionPtr will automatically be cleaned up.
+	// SessionPtr will automatically be cleaned up since is unique ptr
 	// add any logic for cleaning up Onnx logic here
 }
 
 bool UInferenceInterfaceOnnx::LoadModel(const FString& ModelPath)
 {
-	// Initialize global ONNX environment and session options if not already done.
 	if (!GEnv)
 	{
 		GEnv = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "UnrealONNX");
@@ -34,14 +33,19 @@ bool UInferenceInterfaceOnnx::LoadModel(const FString& ModelPath)
 		GSessionOptions->SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
 	}
 
-	// Convert the Unreal FString to a std::string (UTF-8).
-	std::string StdModelPath(TCHAR_TO_UTF8(*ModelPath));
+#if PLATFORM_WINDOWS
+	const std::wstring WideModelPath = *ModelPath;
+	const ORTCHAR_T* ModelPathCStr = WideModelPath.c_str();
+#else
+	const std::string NarrowModelPath = TCHAR_TO_UTF8(*ModelPath);
+	const ORTCHAR_T* ModelPathCStr = NarrowModelPath.c_str();
+#endif
+
 	UE_LOG(LogTemp, Log, TEXT("UInferenceInterfaceOnnx: Loading ONNX model from %s"), *ModelPath);
 
 	try
 	{
-		// Create the ONNX Runtime session.
-		SessionPtr = std::make_unique<Ort::Session>(*GEnv, StdModelPath.c_str(), *GSessionOptions);
+		SessionPtr = std::make_unique<Ort::Session>(*GEnv, ModelPathCStr, *GSessionOptions);
 	}
 	catch (const Ort::Exception& e)
 	{
@@ -52,6 +56,7 @@ bool UInferenceInterfaceOnnx::LoadModel(const FString& ModelPath)
 
 	return true;
 }
+
 
 FString UInferenceInterfaceOnnx::RunInference(const TArray<float>& Observation)
 {
@@ -78,7 +83,6 @@ FString UInferenceInterfaceOnnx::RunInference(const TArray<float>& Observation)
 		InputShape.size()
 	);
 
-	// Define input and output node names. Make sure these match your ONNX model.
 	const char* InputNames[] = { "obs" };
 	const char* OutputNames[] = { "actions" };
 
