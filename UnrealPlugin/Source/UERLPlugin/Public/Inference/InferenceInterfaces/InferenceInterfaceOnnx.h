@@ -6,13 +6,14 @@
 #include <memory>
 #include "InferenceInterfaceOnnx.generated.h"
 
-class Ort::Session;
-class Ort::Env;
-class Ort::SessionOptions;
+struct Ort::Session;
+struct Ort::Env;
+struct Ort::SessionOptions;
 
 /**
  * ONNX-based implementation of the inference interface.
  * Implements model loading and inference using ONNX Runtime.
+ * When converting to Onnx, make sure input_names=["obs"] and output_names=["actions"].
  */
 UCLASS(Blueprintable)
 class UERLPLUGIN_API UInferenceInterfaceOnnx : public UInferenceInterface

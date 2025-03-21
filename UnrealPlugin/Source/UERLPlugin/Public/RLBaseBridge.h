@@ -46,10 +46,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "RLBridge")
     virtual void StartTraining();
 
-    // Called before or during inference mode: load your model. 
+    // Called before or during inference mode: load your model inference interface. 
     // Returns true if loaded succesfully
     UFUNCTION(BlueprintCallable, Category = "RLBridge")
-    bool LoadLocalModel(const FString& ModelPath);
+    bool SetInferenceInterface(UInferenceInterface* Interface);
 
     // Starts training; user calls this after Inference model is initialized.
     UFUNCTION(BlueprintCallable, Category = "RLBridge")

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Sockets.h"
+#include "Inference/InferenceInterfaces/InferenceInterface.h"
 #include "RLBaseBridgeActor.generated.h"
 
 /**
@@ -57,6 +58,19 @@ public:
     virtual void StartTraining();
 
     /**
+     * Called before or during inference mode: load your model inference interface.
+     * Returns true if loaded succesfully
+     */
+    UFUNCTION(BlueprintCallable, Category = "RLBridge")
+    bool SetInferenceInterface(UInferenceInterface* Interface);
+
+    /**
+     * Starts training; user calls this after Inference model is initialized.
+     */
+    UFUNCTION(BlueprintCallable, Category = "RLBridge")
+    virtual void StartInference();
+
+    /**
      * Update loop for RL. Implemented by derived classes. Should be called every tick.
      */
     UFUNCTION(BlueprintCallable, Category = "RLBridge")
@@ -70,8 +84,14 @@ protected:
     FString CurrentIP;
     int32 CurrentPort;
 
+    // Pointer to model interface
+    UInferenceInterface* InferenceInterface = nullptr;
+
     // Flag indicating whether the simulation/training is running.
     bool bIsTraining = false;
+
+    // Flag indicating if inference is running
+    bool bIsInference = false;
 
     // Flag indicating whether we should send observation state or wait for current action to complete
     bool bIsWaitingForAction = false;
@@ -82,6 +102,9 @@ protected:
     // Action space and observation space size
     int32 ActionSpaceSize = 0;
     int32 ObservationSpaceSize = 0;
+
+    // Run inference using loaded model
+    FString RunLocalModelInference(const FString& Observation);
 
     // Default implementations for sending and receiving data over TCP.
     virtual bool SendData(const FString& Data);
