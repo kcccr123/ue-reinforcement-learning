@@ -38,5 +38,6 @@ private:
 	static std::unique_ptr<Ort::SessionOptions> GSessionOptions;
 
 	// The ONNX Runtime session for this model.
+	// TODO: NOT THREAD SAFE FIX LATER
 	std::unique_ptr<Ort::Session> SessionPtr;
 };
