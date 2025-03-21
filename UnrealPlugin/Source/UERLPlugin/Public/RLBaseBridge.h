@@ -51,7 +51,7 @@ public:
     UFUNCTION(BlueprintCallable, Category = "RLBridge")
     bool SetInferenceInterface(UInferenceInterface* Interface);
 
-    // Starts training; user calls this after Inference model is initialized.
+    // Starts inference; user calls this after Inference model is initialized.
     UFUNCTION(BlueprintCallable, Category = "RLBridge")
     virtual void StartInference();
 
