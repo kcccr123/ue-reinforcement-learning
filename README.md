@@ -44,6 +44,9 @@ Made for both developers and non-programmers, the library supports native code a
 
 The framework features a minimal setup process to get you started fast. Its design makes it straightforward to set up training environments and experiment with different reinforcement learning algorithms without hassle.
 
+<a href="https://www.youtube.com/watch?v=M2tfriFZwVQ" target="_blank">
+  <img src="https://img.youtube.com/vi/M2tfriFZwVQ/0.jpg" alt="Watch the video" style="max-width:100%;">
+</a>
 
 
 ### Built With
@@ -61,7 +64,7 @@ Follow the instructions below to get started.
 
 ### Prerequisites
 
-[Unreal Engine 5.3 and above](https://www.unrealengine.com/en-US/download)
+[Unreal Engine 5 and above](https://www.unrealengine.com/en-US/download)
 
 
 ### Getting Started
