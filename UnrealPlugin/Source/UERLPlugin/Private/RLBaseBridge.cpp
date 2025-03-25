@@ -171,6 +171,7 @@ void URLBaseBridge::UpdateRL(float DeltaTime)
             FString ActionResponse = ReceiveData();
             if (!ActionResponse.IsEmpty())
             {
+                bIsWaitingForPythonResp = false;
                 if (ActionResponse.Equals("RESET"))
                 {
                     // reset if simulation is done
@@ -188,7 +189,6 @@ void URLBaseBridge::UpdateRL(float DeltaTime)
                 // interpret response and apply given actions
                 HandleResponseActions(ActionResponse);
                 bIsWaitingForAction = true;
-                bIsWaitingForPythonResp = false;
             }
             else {
                 bIsWaitingForPythonResp = true;

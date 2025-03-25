@@ -17,6 +17,7 @@ public class UERLPlugin : ModuleRules
                 "InputCore",
                 "Sockets",
                 "Networking",
+                "EnhancedInput"
             }
         );
 

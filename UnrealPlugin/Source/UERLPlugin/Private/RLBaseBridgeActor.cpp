@@ -175,6 +175,7 @@ void ARLBaseBridgeActor::UpdateRL(float DeltaTime)
             FString ActionResponse = ReceiveData();
             if (!ActionResponse.IsEmpty())
             {
+                bIsWaitingForPythonResp = false;
                 if (ActionResponse.Equals("RESET"))
                 {
                     HandleReset();
@@ -190,7 +191,6 @@ void ARLBaseBridgeActor::UpdateRL(float DeltaTime)
 
                 HandleResponseActions(ActionResponse);
                 bIsWaitingForAction = true;
-                bIsWaitingForPythonResp = false;
             }
             else {
                 bIsWaitingForPythonResp = true;
