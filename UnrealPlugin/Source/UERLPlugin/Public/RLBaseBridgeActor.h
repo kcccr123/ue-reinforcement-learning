@@ -1,0 +1,169 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "Sockets.h"
+#include "Inference/InferenceInterfaces/InferenceInterface.h"
+#include "RLBaseBridgeActor.generated.h"
+
+/**
+ * Base class for RL communication using TCP.
+ * This class provides a framework for setting up your RL environment in Unreal Engine.
+ * It includes default implementations for connecting and disconnecting via TCP.
+ * Allows tick group to be audjusted unlike UObject implementation of RL Bridge.
+ */
+UCLASS(Abstract)
+class UERLPLUGIN_API ARLBaseBridgeActor : public AActor
+{
+    GENERATED_BODY()
+
+    //---------------------------------------------------------
+    // Functions for general RL communication
+    //---------------------------------------------------------
+public:
+    /**
+     * Initialization function that can be implemented for special behavior in derived classes
+     * Called at the start of Connect()
+     * Intended to be used for setting up values for TCP handshake
+     */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge")
+    void InitializeBridge();
+    virtual void InitializeBridge_Implementation();
+
+    /**
+     * Sends TCP handshake to python environment.
+     * Called once connection is made; sends any information the python environment needs before training starts.
+     * If overriden, user needs to make sure to send action and observation space size in handshake.
+     */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge")
+    void SendHandshake();
+    virtual void SendHandshake_Implementation();
+
+    /**
+     * Connect to TCP socket, passing IP, port, and desired sizes for action and observation spaces.
+     */
+    UFUNCTION(BlueprintCallable, Category = "RLBridge")
+    virtual bool Connect(const FString& IPAddress, int32 port, int32 actionSpaceSize, int32 obsSpaceSize);
+
+    /**
+     * Disconnect from TCP.
+     */
+    UFUNCTION(BlueprintCallable, Category = "RLBridge")
+    virtual void Disconnect();
+
+    /**
+     * Starts training; user calls this after environment is initialized.
+     */
+    UFUNCTION(BlueprintCallable, Category = "RLBridge")
+    virtual void StartTraining();
+
+    /**
+     * Called before or during inference mode: load your model inference interface.
+     * Returns true if loaded succesfully
+     */
+    UFUNCTION(BlueprintCallable, Category = "RLBridge")
+    bool SetInferenceInterface(UInferenceInterface* Interface);
+
+    /**
+     * Starts training; user calls this after Inference model is initialized.
+     */
+    UFUNCTION(BlueprintCallable, Category = "RLBridge")
+    virtual void StartInference();
+
+    /**
+     * Update loop for RL. Implemented by derived classes. Should be called every tick.
+     */
+    UFUNCTION(BlueprintCallable, Category = "RLBridge")
+    virtual void UpdateRL(float DeltaTime);
+
+protected:
+    // Pointer to the TCP socket.
+    FSocket* ConnectionSocket = nullptr;
+
+    // Socket info (set on connection).
+    FString CurrentIP;
+    int32 CurrentPort;
+
+    // Pointer to model interface
+    UInferenceInterface* InferenceInterface = nullptr;
+
+    // Flag indicating whether the simulation/training is running.
+    bool bIsTraining = false;
+
+    // Flag indicating if inference is running
+    bool bIsInference = false;
+
+    // Flag indicating whether we should send observation state or wait for current action to complete
+    bool bIsWaitingForAction = false;
+
+    // Flag indicating if waiting for python response from sending an action
+    bool bIsWaitingForPythonResp = false;
+
+    // Action space and observation space size
+    int32 ActionSpaceSize = 0;
+    int32 ObservationSpaceSize = 0;
+
+    // Run inference using loaded model
+    FString RunLocalModelInference(const FString& Observation);
+
+    // Default implementations for sending and receiving data over TCP.
+    virtual bool SendData(const FString& Data);
+    virtual FString ReceiveData();
+
+    //---------------------------------------------------------
+    // Required Environment Overrides
+    // (Functions the user must implement for custom environment logic)
+    //---------------------------------------------------------
+public:
+    /**
+     * Calculate reward based on the environment state.
+     * Must set 'bDone' to true if the episode should end.
+     */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge|Environment")
+    float CalculateReward(bool& bDone);
+    virtual float CalculateReward_Implementation(bool& bDone);
+
+    /**
+     * Create a state string that packs observation data to send to the RL model.
+     */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge|Environment")
+    FString CreateStateString();
+    virtual FString CreateStateString_Implementation();
+
+    /**
+     * Handle a "RESET" command from the RL model to reset the simulation.
+     */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge|Environment")
+    void HandleReset();
+    virtual void HandleReset_Implementation();
+
+    /**
+     * Process received actions from the RL model and apply them to the environment.
+     */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge|Environment")
+    void HandleResponseActions(const FString& actions);
+    virtual void HandleResponseActions_Implementation(const FString& actions);
+
+    /**
+     * Called each frame to check if an in-progress action should block sending new states.
+     * If this returns true, UpdateRL will skip its normal logic this tick.
+     */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge|Environment")
+    bool IsActionRunning();
+    virtual bool IsActionRunning_Implementation();
+
+    //---------------------------------------------------------
+    // AActor overrides
+    //---------------------------------------------------------
+public:
+    // Sets default values for this actor's properties
+    ARLBaseBridgeActor();
+
+    // Called when the game starts or when spawned
+    virtual void BeginPlay() override;
+
+    /**
+    * By default tick occurs as part of post physics. Can be overriden.
+    */
+    virtual void Tick(float DeltaTime) override;
+};

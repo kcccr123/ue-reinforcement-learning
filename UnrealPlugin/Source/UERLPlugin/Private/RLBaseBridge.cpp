@@ -3,8 +3,8 @@
 #include "SocketSubsystem.h"
 #include "Interfaces/IPv4/IPv4Address.h"
 #include "Common/TcpSocketBuilder.h"
+#include "UERLPlugin/Helpers/BPFL_DataHelpers.h" 
 #include "HAL/PlatformProcess.h"
-
 
 void URLBaseBridge::InitializeBridge_Implementation()
 {
@@ -108,45 +108,109 @@ void URLBaseBridge::Disconnect()
 void URLBaseBridge::StartTraining()
 {
     bIsTraining = true;
+    bIsInference = false;
+}
+
+bool URLBaseBridge::SetInferenceInterface(UInferenceInterface* Interface)
+{
+    if (Interface) {
+        InferenceInterface = Interface;
+        return true;
+    }
+    else {
+        UE_LOG(LogTemp, Warning, TEXT("RLBaseBridge: Empty InferenceInterface ptr."));
+        return false;
+    }
+    
+}
+
+
+void URLBaseBridge::StartInference()
+{
+    bIsTraining = false;
+    bIsInference = true;
+}
+
+
+FString URLBaseBridge::RunLocalModelInference(const FString& Observation)
+{
+    if (InferenceInterface) {
+        return InferenceInterface->RunInference(UBPFL_DataHelpers::ParseStateString(Observation));
+    }
+    else {
+        UE_LOG(LogTemp, Warning, TEXT("RLBaseBridge: Empty InferenceInterface ptr."));
+        return "";
+    }
+    
 }
 
 void URLBaseBridge::UpdateRL(float DeltaTime)
 {
     UE_LOG(LogTemp, Log, TEXT("Updaing"));
-    // ---------------------- MAKE STATE STRING ---------------------------------
-    bool bDone = false;
-    float Reward = CalculateReward(bDone);
-    int32 DoneInt = bDone ? 1 : 0;
 
-    // Combine both into one state string (using a delimiter, e.g., semicolon)
-    FString DataToSend = FString::Printf(TEXT("%s%.2f;%d"), *CreateStateString(), Reward, DoneInt);
-
-    // ---------------------- MAKE STATE STRING ---------------------------------
-    // send data
-    SendData(DataToSend);
-
-    // recieve response
-    FString ActionResponse = ReceiveData();
-    if (!ActionResponse.IsEmpty())
+    if (!bIsWaitingForAction)
     {
-        if (ActionResponse.Equals("RESET"))
-        {
-            // reset if simulation is done
-            HandleReset();
-            return;
-        }
+        if (bIsTraining) {
+            if (!bIsWaitingForPythonResp) {
+                // ---------------------- MAKE STATE STRING ---------------------------------
+                bool bDone = false;
+                float Reward = CalculateReward(bDone);
+                int32 DoneInt = bDone ? 1 : 0;
 
-        if (ActionResponse.Equals("TRAINING_COMPLETE"))
-        {
-            // reset if simulation is done
-            HandleReset();
-            Disconnect();
-            return;
+                // Combine both into one state string (using a delimiter, e.g., semicolon)
+                FString DataToSend = FString::Printf(TEXT("%s%.2f;%d"), *CreateStateString(), Reward, DoneInt);
+
+                // ---------------------- MAKE STATE STRING ---------------------------------
+                // send data
+                SendData(DataToSend);
+                bIsWaitingForPythonResp = true;
+            }
+
+
+            // receive response
+            FString ActionResponse = ReceiveData();
+            if (!ActionResponse.IsEmpty())
+            {
+                bIsWaitingForPythonResp = false;
+                if (ActionResponse.Equals("RESET"))
+                {
+                    // reset if simulation is done
+                    HandleReset();
+                    return;
+                }
+
+                if (ActionResponse.Equals("TRAINING_COMPLETE"))
+                {
+                    // reset if simulation is done
+                    HandleReset();
+                    Disconnect();
+                    return;
+                }
+                // interpret response and apply given actions
+                HandleResponseActions(ActionResponse);
+                bIsWaitingForAction = true;
+            }
+            else {
+                bIsWaitingForPythonResp = true;
+            }
         }
-        // interpret response and apply given actions
-        HandleResponseActions(ActionResponse);
+        if (bIsInference) {
+            // if inference mode, run inference through loaded model instead
+            FString ActionResponse = RunLocalModelInference(CreateStateString());
+            if (!ActionResponse.IsEmpty()) {
+                HandleResponseActions(ActionResponse);
+                bIsWaitingForAction = true;
+            }
+            
+
+        }
+       
     }
-
+    else
+    {
+        // Wait if the character is still moving
+        bIsWaitingForAction = IsActionRunning();
+    }
 }
 
 bool URLBaseBridge::SendData(const FString& Data)
@@ -226,15 +290,22 @@ void URLBaseBridge::HandleResponseActions_Implementation(const FString& actions)
 }
 
 
-void URLBaseBridge::Tick(float DeltaTime)
+bool URLBaseBridge::IsActionRunning_Implementation()
 {
+    return false;
+}
+
+void URLBaseBridge::Tick(float DeltaTime)
+{ 
+    
     UpdateRL(DeltaTime);
+
 }
 
 bool URLBaseBridge::IsTickable() const
 {
 
-    return ConnectionSocket != nullptr && bIsTraining;
+    return (bIsTraining && ConnectionSocket) || bIsInference;
 }
 
 
