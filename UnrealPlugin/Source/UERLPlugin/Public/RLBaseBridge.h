@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "Tickable.h"
+#include "Inference/InferenceInterfaces/InferenceInterface.h"
 #include "RLBaseBridge.generated.h"
 
 /**
@@ -45,9 +46,15 @@ public:
     UFUNCTION(BlueprintCallable, Category = "RLBridge")
     virtual void StartTraining();
 
-    // Update loop for RL. Implemented by derived classes. Should be called every tick.
+    // Called before or during inference mode: load your model inference interface. 
+    // Returns true if loaded succesfully
     UFUNCTION(BlueprintCallable, Category = "RLBridge")
-    virtual void UpdateRL(float DeltaTime);
+    bool SetInferenceInterface(UInferenceInterface* Interface);
+
+    // Starts inference; user calls this after Inference model is initialized.
+    UFUNCTION(BlueprintCallable, Category = "RLBridge")
+    virtual void StartInference();
+
 
 protected:
     // Pointer to the TCP socket.
@@ -57,12 +64,30 @@ protected:
     FString CurrentIP;
     int32 CurrentPort;
 
+    // Pointer to model interface
+    UInferenceInterface * InferenceInterface = nullptr;
+
     // Flag indicating whether the simulation/training is running.
     bool bIsTraining = false;
+
+    // Flag indicating if inference is running
+    bool bIsInference = false;
+
+    // Flag indicating whether we should send observation state or wait for current action to complete
+    bool bIsWaitingForAction = false;
+
+    // Flag indicating if waiting for python response from sending an action
+    bool bIsWaitingForPythonResp = false;
 
     // Action space and observation space size
     int32 ActionSpaceSize = 0;
     int32 ObservationSpaceSize = 0;
+
+    // Run inference using loaded model
+    FString RunLocalModelInference(const FString& Observation);
+
+    // Update loop for RL. Implemented by derived classes. Should be called every tick.
+    virtual void UpdateRL(float DeltaTime);
 
     // Default implementations for sending and receiving data over TCP.
     virtual bool SendData(const FString& Data);
@@ -94,6 +119,14 @@ public:
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge|Environment")
     void HandleResponseActions(const FString& actions);
     virtual void HandleResponseActions_Implementation(const FString& actions);
+
+    /**
+     * Called each frame to check if an in-progress action should block sending new states.
+     * If this returns true, UpdateRL will skip its normal logic this tick.
+     */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "RLBridge|Environment")
+    bool IsActionRunning();
+    virtual bool IsActionRunning_Implementation();
 
 //---------------------------------------------------------
 // FTickableGameObject Interface:
