@@ -9,7 +9,7 @@
 <h3 align="center">Unreal Engine Deep Reinforcement Learning Library</h3>
 
   <p align="center">
-    Library and plugin for streamlined development of learning agents in Unreal Engine 5
+    Library and framework for streamlined development of learning agents in Unreal Engine 5
    <br />
 
 <!-- TABLE OF CONTENTS -->
@@ -38,15 +38,19 @@
 
 ## About The Project
 
-Deep reinforcement learning framework designed specifically for integration with Unreal Engine.
+A deep reinforcement learning framework designed specifically for integration with Unreal Engine.
 
-Made for both developers and non-programmers, the library supports native code alongside Blueprint visual scripting, enabling users to implement learning agents within their Unreal projects regardless of their programming background.
+Made for both developers and non-programmers, the framework supports native code alongside Blueprint visual scripting, enabling users to implement learning agents within their Unreal projects regardless of their programming background.
 
-The framework features a minimal setup process to get you started fast. Its design makes it straightforward to set up training environments and experiment with different reinforcement learning algorithms without hassle.
+Features a minimal setup process to get you started fast. The design makes it straightforward to set up training environments and experiment with different reinforcement learning algorithms without hassle.
+
+Below is an library overview video demonstrating an implementation of the framework with a basic example.  
+You can find more information and documentation at the [GitHub repository wiki](https://github.com/kcccr123/ue-reinforcement-learning/wiki).
 
 <a href="https://www.youtube.com/watch?v=M2tfriFZwVQ" target="_blank">
   <img src="https://img.youtube.com/vi/M2tfriFZwVQ/0.jpg" alt="Watch the video" style="max-width:100%;">
 </a>
+
 
 
 ### Built With
@@ -73,7 +77,8 @@ Open your terminal and clone the repository to your local machine:
 
 `git clone https://github.com/kcccr123/ue-reinforcement-learning.git`
 
-The repository is split into an external python module and an Unreal Editor project plugin. 
+The repository is split into an external python module and an Unreal Editor project plugin.  
+**Instead** of cloning, you can choose to download the Unreal Plugin and Python module seperately from the GitHub releases. 
 
 #### Unreal Setup
 
@@ -88,21 +93,24 @@ YourUnrealProject/
 ```
 2. Enable the plugin inside the Unreal Editor.
    
-Open your Unreal project inside the editor. Navigate to Edit > Plugins. Locate your plugin in the list (it might be under a relevant category such as "Other" or "Installed Plugins"). Check the box to enable the plugin. Restart Unreal Engine if prompted.
+Open your Unreal project inside the editor. Navigate to Edit > Plugins. Locate your plugin in the list (it might be under a relevant category such as "Other" or "Installed Plugins"). Check the box to enable the plugin. 
+Restart Unreal Engine.
 
 #### Python Setup
 
-It is recommended you create a virtual enviornment to keep track of your packages. 
+It is generally recommended you create a virtual enviornment to manage dependencies, but it is not strictly required.
 
-## Usage
+1. In your terminal, cd into the `PythonEnv` directory. 
+
+2. Run the commmand `pip install -r requirements.txt` to install the required Python dependencies.
 
 
 <!-- CONTACT -->
 
 ## Contact
 
-Feel free to contact us at:
+Feel free to contact me at:
 
-@Kevin Chen - kevinz.chen@mail.utoronto.ca\
+@Kevin Chen - kevinz.chen@mail.utoronto.ca
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
