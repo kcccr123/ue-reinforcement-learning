@@ -47,9 +47,11 @@ Features a minimal setup process to get you started fast. The design makes it st
 Below is an library overview video demonstrating an implementation of the framework with a basic example.  
 You can find more information and documentation at the [GitHub repository wiki](https://github.com/kcccr123/ue-reinforcement-learning/wiki).
 
-<a href="https://www.youtube.com/watch?v=M2tfriFZwVQ" target="_blank">
-  <img src="https://img.youtube.com/vi/M2tfriFZwVQ/0.jpg" alt="Watch the video" style="max-width:100%;">
-</a>
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=M2tfriFZwVQ" target="_blank">
+    <img src="https://img.youtube.com/vi/M2tfriFZwVQ/0.jpg" alt="Watch the video" style="max-width:100%;">
+  </a>
+</p>
 
 
 
