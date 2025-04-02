@@ -66,7 +66,7 @@ bool URLBaseBridge::Connect(const FString& IPAddress, int32 port, int32 actionSp
     // Close the listening socket and replace it with the accepted client socket.
     ConnectionSocket->Close();
     SocketSubsystem->DestroySocket(ConnectionSocket);
-    ConnectionSocket = ClientSocket;
+    ConnectionSocket = ClientSocket;    
 
     UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Accepted connection"));
 
