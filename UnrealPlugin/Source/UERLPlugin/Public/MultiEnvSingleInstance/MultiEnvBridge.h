@@ -68,8 +68,4 @@ protected:
     //  RL Loop: UpdateRL Implementation
     // -------------------------------------------------------------
     virtual void UpdateRL_Implementation(float DeltaTime) override;
-
-    // Helper functions for parsing messages (can be private).
-    int32 ParseEnvId(const FString& Message) const;
-    FString ParseActionString(const FString& Message) const;
 };

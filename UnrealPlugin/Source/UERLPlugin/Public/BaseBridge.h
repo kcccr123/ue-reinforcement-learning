@@ -15,8 +15,9 @@ class UTcpConnection;
  * - Inference interface
  * - An abstract UpdateRL method that subclasses must override.
  *
- * Subclasses will implement their own environment callbacks (reward, state, etc.)
- * and override UpdateRL to integrate them.
+ * Subclasses override UpdateRL to integrate enviornment callbacks.
+ * Users will implement their own environment callbacks (reward, state, etc.) to 
+ * fit their simulation requirements.
  */
 UCLASS(Abstract, Blueprintable)
 class UERLPLUGIN_API UBaseBridge : public UObject, public FTickableGameObject
