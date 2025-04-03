@@ -1,5 +1,6 @@
 #include "MultiEnvSingleInstance/MultiEnvBridge.h"
 #include "Misc/Parse.h"
+#include "UERLPlugin/Helpers/PythonMsgParsingHelpers.h"
 #include "HAL/PlatformProcess.h"
 
 void UMultiEnvBridge::InitializeEnvironments(int32 InNumEnvironments, bool bInInferenceMode)
@@ -70,8 +71,6 @@ bool UMultiEnvBridge::IsActionRunningForEnv_Implementation(int32 EnvId)
 void UMultiEnvBridge::UpdateRL_Implementation(float DeltaTime)
 {
 
-    UE_LOG(LogTemp, Log, TEXT("Updating"));
-
     if (bIsTraining) {
         // receive response
         FString PythonMessage = ReceiveData();
@@ -85,8 +84,8 @@ void UMultiEnvBridge::UpdateRL_Implementation(float DeltaTime)
             PythonMessage.ParseIntoArray(actionMsgArray, TEXT("||"), true);
 
             for (int i = 0; i < actionMsgArray.Num(); i++) {
-                FString ActionString = ParseActionString(actionMsgArray[i]);
-                int32 EnvId = ParseEnvId(ActionString);
+                FString ActionString = UPythonMsgParsingHelpers::ParseActionString(actionMsgArray[i]);
+                int32 EnvId = UPythonMsgParsingHelpers::ParseEnvId(actionMsgArray[i]);
                 if (ActionString.Contains("RESET"))
                 {
                     // reset if simulation is done
@@ -143,34 +142,4 @@ void UMultiEnvBridge::UpdateRL_Implementation(float DeltaTime)
 
     }
 
-}
-
-// helper functions for message parsing
-int32 UMultiEnvBridge::ParseEnvId(const FString& Message) const
-{
-    // Expected format: "ENV=2;ACT=0.10,-0.20" or "ENV=1;RESET"
-    int32 EnvId = 0;
-    int32 StartIdx = Message.Find(TEXT("ENV="));
-    if (StartIdx != INDEX_NONE)
-    {
-        StartIdx += 4; // Skip "ENV="
-        int32 EndIdx;
-        if (Message.FindChar(';', EndIdx))
-        {
-            FString EnvIdStr = Message.Mid(StartIdx, EndIdx - StartIdx);
-            EnvId = FCString::Atoi(*EnvIdStr);
-        }
-    }
-    return EnvId;
-}
-
-FString UMultiEnvBridge::ParseActionString(const FString& Message) const
-{
-    // Expected format: "ENV=x;ACT=0.10,-0.20"
-    int32 ActIdx = Message.Find(TEXT("ACT="));
-    if (ActIdx != INDEX_NONE)
-    {
-        return Message.Mid(ActIdx + 4).TrimStartAndEnd();
-    }
-    return FString();
 }

@@ -5,7 +5,7 @@ from .gym_wrapper_base import GymWrapperBase
 
 class GymWrapperGeneral(gym.Env, GymWrapperBase):
     """
-    A dynamic Gym environment implementation for general use.
+    A dynamic Gym environment implementation for general use with RLBaseBridge subclasses.
     Inherits TCP logic from GymWrapperBase and the Gym Env interface from gym.Env.
     """
     def __init__(self, ip='127.0.0.1', port=7777):
