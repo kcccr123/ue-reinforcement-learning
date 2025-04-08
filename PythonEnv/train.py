@@ -1,53 +1,88 @@
 import numpy as np
-
-# Stable Baselines3 algorithms
-from stable_baselines3 import PPO, SAC, TD3
+import socket
+from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
+from gymnasium import spaces
+
+# Import only GymWrapperGeneral.
 from gym_wrappers.gym_wrapper_general import GymWrapperGeneral
 
-"""
-train.py
-
-Single-file training script:
-Defines constants for hyperparameters and environment configuration at the top.
-
-Usage:
-  Just run: python train.py
-  Modify the constants at the top to suit your needs.
-"""
-
 # -------------------- CONSTANTS -------------------- #
+ENV_IP = "127.0.0.1"        # Unreal TCP server IP
+ENV_PORT = 7777             # Unreal TCP server port
 
-ENV_IP = "127.0.0.1"        # IP address of the Unreal TCP server
-ENV_PORT = 7777             # Port for the Unreal TCP server
+TOTAL_TIMESTEPS = 1000000   # Total training timesteps
+LEARNING_RATE = 3e-4        # Learning rate
+GAMMA = 0.99                # Discount factor
+N_STEPS = 2048              # Batch size per update
+BATCH_SIZE = 128            # Mini-batch size for PPO updates
+ENT_COEF = 0.01             # Entropy coefficient
+GAE_LAMBDA = 0.95           # GAE lambda
+CLIP_RANGE = 0.2            # PPO clipping parameter
+VF_COEF = 0.5              # Value function loss coefficient
+MAX_GRAD_NORM = 0.5         # Gradient clipping
 
-TOTAL_TIMESTEPS = 1000000    # Total training timesteps
-LEARNING_RATE = 3e-4         # Reduced learning rate for stability
-GAMMA = 0.99                 # Discount factor
-N_STEPS = 2048               # Increased batch size per update
-BATCH_SIZE = 128             # Mini-batch size for PPO updates
-ENT_COEF = 0.01              # Entropy coefficient for improved exploration
-GAE_LAMBDA = 0.95            # Generalized Advantage Estimation lambda
-CLIP_RANGE = 0.2             # PPO clipping parameter
-VF_COEF = 0.5                # Value function loss coefficient
-MAX_GRAD_NORM = 0.5          # Gradient clipping
+MODEL_NAME = "model"        # Model filename prefix
 
-MODEL_NAME = "model"  # Filename prefix for saving the model
+# -------------------- FACTORY FUNCTION -------------------- #
+def create_gym_env(ip=ENV_IP, port=ENV_PORT):
+    # Create a socket and connect.
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.connect((ip, port))
+        print(f"[Factory] Connected to {ip}:{port}")
+    except Exception as e:
+        print(f"[Factory] Failed to connect: {e}")
+        return None
 
-# ------------------------------------------------------ #
+    # Receive handshake message until the "STEP" delimiter is encountered.
+    recv_buffer = ""
+    bufsize = 1024
+    while "STEP" not in recv_buffer:
+        data = sock.recv(bufsize)
+        if not data:
+            break
+        recv_buffer += data.decode('utf-8')
+    if "STEP" in recv_buffer:
+        handshake, remaining = recv_buffer.split("STEP", 1)
+        handshake = handshake.strip()
+        print(f"[Factory] Handshake received: {handshake}")
+    else:
+        print("[Factory] No valid handshake received.")
+        sock.close()
+        return None
 
-def make_env():
-    """
-    Returns a Gym environment instance that connects to Unreal via TCP.
-    Modify this if you want to use a different environment or pass extra parameters.
-    """
-    env = GymWrapperGeneral(ip=ENV_IP, port=ENV_PORT)
+    # Parse the handshake. Expected format:
+    # "CONFIG:OBS=<obs_shape>;ACT=<act_shape>;[ENV_TYPE=<type>;ENV_COUNT=<n>]"
+    # In this reverted version, we ignore any multi-env configuration.
+    try:
+        config_body = handshake.split("CONFIG:")[1]
+        parts = config_body.split(";")
+        obs_part = parts[0]  # e.g., "OBS=7"
+        act_part = parts[1]  # e.g., "ACT=6"
+        obs_shape = int(obs_part.split("=")[1])
+        act_shape = int(act_part.split("=")[1])
+        print(f"[Factory] Parsed handshake: obs_shape={obs_shape}, act_shape={act_shape}")
+    except Exception as e:
+        print(f"[Factory] Error parsing handshake: {e}")
+        sock.close()
+        return None
+
+    # Always use GymWrapperGeneral.
+    env = GymWrapperGeneral(ip=ip, port=port, sock=sock, use_external_handshake=True)
+    env.obs_shape = obs_shape
+    env.act_shape = act_shape
+    env.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_shape,), dtype=np.float32)
+    env.action_space = spaces.Box(low=-1.0, high=1.0, shape=(act_shape,), dtype=np.float32)
+    print("[Factory] Using GymWrapperGeneral.")
     return env
 
-# Initialize the environment
+def make_env():
+    return create_gym_env()
+
+# -------------------- TRAINING SCRIPT -------------------- #
 env = DummyVecEnv([make_env])
 
-# Initialize PPO algorithm with detailed hyperparameters
 model = PPO(
     "MlpPolicy",
     env,
@@ -63,14 +98,10 @@ model = PPO(
     max_grad_norm=MAX_GRAD_NORM
 )
 
-# Train the model
 model.learn(total_timesteps=TOTAL_TIMESTEPS)
-
-# Save the model
 model.save(MODEL_NAME)
 print(f"Model saved as '{MODEL_NAME}'")
 
 env.envs[0].send_data("TRAINING_COMPLETE")
 print("Training done")
-
 env.close()

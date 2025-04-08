@@ -1,22 +1,25 @@
+﻿// BaseBridge.h
+
 #pragma once
 
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "Tickable.h" // For FTickableGameObject
 #include "Inference/InferenceInterfaces/InferenceInterface.h"
+#include "TcpConnection/BaseTcpConnection.h"
 #include "BaseBridge.generated.h"
 
-class UTcpConnection;
+class UBaseTcpConnection;
 
 /**
- * An abstract base class that defines high-level RL bridging:
+ * An abstract base class that defines high‑level RL bridging:
  * - TCP connection management (Connect, Disconnect, etc.)
  * - RL modes (StartTraining, StartInference)
  * - Inference interface
  * - An abstract UpdateRL method that subclasses must override.
  *
- * Subclasses override UpdateRL to integrate enviornment callbacks.
- * Users will implement their own environment callbacks (reward, state, etc.) to 
+ * Subclasses override UpdateRL to integrate environment callbacks.
+ * Users will implement their own environment callbacks (reward, state, etc.) to
  * fit their simulation requirements.
  */
 UCLASS(Abstract, Blueprintable)
@@ -43,12 +46,6 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Bridge|Connection")
     virtual void Disconnect();
 
-    /**
-     * Optionally sends a handshake message (subclasses may override).
-     */
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Bridge|Connection")
-    void SendHandshake();
-    virtual void SendHandshake_Implementation();
 
     // -------------------------------------------------------------
     //  RL Modes (Training / Inference)
@@ -61,6 +58,7 @@ public:
     /** Switch to inference mode. */
     UFUNCTION(BlueprintCallable, Category = "Bridge|Mode")
     virtual void StartInference();
+
 
     // -------------------------------------------------------------
     //  Inference (Local Model)
@@ -80,6 +78,31 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Bridge|Inference")
     virtual FString RunLocalModelInference(const FString& Observation);
 
+
+protected:
+    // -------------------------------------------------------------
+    //  Protected Members
+    // -------------------------------------------------------------
+
+    /** Pointer to our low-level TCP helper for sockets. */
+    UPROPERTY()
+    UBaseTcpConnection* TcpConnection = nullptr;
+
+    /** Pointer to a local inference interface, if used. */
+    UPROPERTY()
+    UInferenceInterface* InferenceInterface = nullptr;
+
+    /** True if in training mode. */
+    bool bIsTraining = false;
+
+    /** True if in inference mode. */
+    bool bIsInference = false;
+
+    /** Action/Observation space sizes, typically assigned on connect. */
+    int32 ActionSpaceSize = 0;
+    int32 ObservationSpaceSize = 0;
+
+
     // -------------------------------------------------------------
     //  RL Loop
     // -------------------------------------------------------------
@@ -91,8 +114,9 @@ public:
     void UpdateRL(float DeltaTime);
     virtual void UpdateRL_Implementation(float DeltaTime);
 
+
     // -------------------------------------------------------------
-    //  Communication (Optional Wrappers)
+    //  Protected Communication
     // -------------------------------------------------------------
 
     /**
@@ -108,26 +132,22 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Bridge|Communication")
     virtual FString ReceiveData();
 
-protected:
-    // -------------------------------------------------------------
-    //  Protected Members
-    // -------------------------------------------------------------
+    /**
+     * Sends a handshake message that sets up training on Python Module (subclasses may override).
+     */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Bridge|Connection")
+    void SendHandshake();
+    virtual void SendHandshake_Implementation();
 
-    /** Pointer to our low-level TCP helper for sockets. */
-    UTcpConnection* TcpConnection = nullptr;
+    /**
+     * Factory for the TCP connection object.
+     * Subclasses (in C++ or Blueprint) must implement this to return
+     * their desired UBaseTcpConnection subclass.
+     */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Bridge|Connection")
+    UBaseTcpConnection* CreateTcpConnection();
+    virtual UBaseTcpConnection* CreateTcpConnection_Implementation();
 
-    /** Pointer to a local inference interface, if used. */
-    UInferenceInterface* InferenceInterface = nullptr;
-
-    /** True if in training mode. */
-    bool bIsTraining = false;
-
-    /** True if in inference mode. */
-    bool bIsInference = false;
-
-    /** Action/Observation space sizes, typically assigned on connect. */
-    int32 ActionSpaceSize = 0;
-    int32 ObservationSpaceSize = 0;
 
 public:
     // -------------------------------------------------------------

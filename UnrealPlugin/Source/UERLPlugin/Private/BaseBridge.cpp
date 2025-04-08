@@ -1,39 +1,36 @@
+// BaseBridge.cpp
+
 #include "BaseBridge.h"
-#include "TcpConnection/TcpConnection.h"
-#include "Inference/InferenceInterfaces/InferenceInterface.h"
 #include "UERLPlugin/Helpers/BPFL_DataHelpers.h"
 
-// -------------------------------------------------------------
-//  Connection & Setup
-// -------------------------------------------------------------
 bool UBaseBridge::Connect_Implementation(const FString& IPAddress, int32 Port, int32 InActionSpaceSize, int32 InObservationSpaceSize)
 {
-    // Store user-provided details
     ActionSpaceSize = InActionSpaceSize;
     ObservationSpaceSize = InObservationSpaceSize;
 
-    // Initialize the TCP connection if needed
     if (!TcpConnection)
     {
-        TcpConnection = NewObject<UTcpConnection>(this);
+        TcpConnection = CreateTcpConnection();
+        if (!TcpConnection)
+        {
+            UE_LOG(LogTemp, Error, TEXT("[UBaseBridge] CreateTcpConnection returned null. Please override CreateTcpConnection in C++ or Blueprint."));
+            return false;
+        }
     }
 
-    // Start listening
     if (!TcpConnection->StartListening(IPAddress, Port))
     {
         UE_LOG(LogTemp, Error, TEXT("[UBaseBridge] Failed to start listening on %s:%d"), *IPAddress, Port);
         return false;
     }
 
-    // Accept the incoming connection
-    if (!TcpConnection->AcceptConnection())
+    if (!TcpConnection->IsConnected())
     {
-        UE_LOG(LogTemp, Error, TEXT("[UBaseBridge] Failed to accept connection."));
+        UE_LOG(LogTemp, Error, TEXT("[UBaseBridge] No client connected after StartListening."));
         return false;
     }
 
     SendHandshake();
-
     return true;
 }
 
@@ -48,14 +45,11 @@ void UBaseBridge::Disconnect()
 
 void UBaseBridge::SendHandshake_Implementation()
 {
-    FString HandshakeMessage = FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d"), ObservationSpaceSize, ActionSpaceSize);
-    SendData(HandshakeMessage);
-    UE_LOG(LogTemp, Log, TEXT("[UBaseBridge] Default handshake sent: %s"), *HandshakeMessage);
+    const FString Msg = FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d"), ObservationSpaceSize, ActionSpaceSize);
+    SendData(Msg);
+    UE_LOG(LogTemp, Log, TEXT("[UBaseBridge] Handshake sent: %s"), *Msg);
 }
 
-// -------------------------------------------------------------
-//  RL Modes
-// -------------------------------------------------------------
 void UBaseBridge::StartTraining()
 {
     bIsTraining = true;
@@ -68,9 +62,6 @@ void UBaseBridge::StartInference()
     bIsInference = true;
 }
 
-// -------------------------------------------------------------
-//  Inference
-// -------------------------------------------------------------
 bool UBaseBridge::SetInferenceInterface(UInferenceInterface* Interface)
 {
     if (Interface)
@@ -84,32 +75,20 @@ bool UBaseBridge::SetInferenceInterface(UInferenceInterface* Interface)
 
 FString UBaseBridge::RunLocalModelInference(const FString& Observation)
 {
-    if (InferenceInterface)
-    {
-        // Example: parse CSV float data
-        TArray<float> ParsedObs = UBPFL_DataHelpers::ParseStateString(Observation);
-        return InferenceInterface->RunInference(ParsedObs);
-    }
-    else
+    if (!InferenceInterface)
     {
         UE_LOG(LogTemp, Warning, TEXT("[UBaseBridge] No InferenceInterface set."));
         return TEXT("");
     }
+    TArray<float> Parsed = UBPFL_DataHelpers::ParseStateString(Observation);
+    return InferenceInterface->RunInference(Parsed);
 }
 
-// -------------------------------------------------------------
-//  RL Loop
-// -------------------------------------------------------------
-void UBaseBridge::UpdateRL_Implementation(float DeltaTime)
+void UBaseBridge::UpdateRL_Implementation(float)
 {
-    // No default environment logic here.
-    // Child classes (SingleEnvBridge, MultiEnvBridge, etc.)
-    // override this to implement their step logic.
+    // Must be overridden by subclass.
 }
 
-// -------------------------------------------------------------
-//  Communication
-// -------------------------------------------------------------
 bool UBaseBridge::SendData(const FString& Data)
 {
     if (!TcpConnection || !TcpConnection->IsConnected())
@@ -117,14 +96,7 @@ bool UBaseBridge::SendData(const FString& Data)
         UE_LOG(LogTemp, Error, TEXT("[UBaseBridge] SendData: No valid TCP connection."));
         return false;
     }
-
-    FString DataWithDelimiter = Data + TEXT("STEP");
-    bool bResult = TcpConnection->SendMessage(DataWithDelimiter);
-    if (!bResult)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[UBaseBridge] Failed to send data: %s"), *Data);
-    }
-    return bResult;
+    return TcpConnection->SendMessageEnv(Data + TEXT("STEP"));
 }
 
 FString UBaseBridge::ReceiveData()
@@ -134,15 +106,17 @@ FString UBaseBridge::ReceiveData()
         UE_LOG(LogTemp, Error, TEXT("[UBaseBridge] ReceiveData: No valid TCP connection."));
         return TEXT("");
     }
-    return TcpConnection->ReceiveMessage(1024);
+    return TcpConnection->ReceiveMessageEnv(1024);
 }
 
-// -------------------------------------------------------------
-//  FTickableGameObject
-// -------------------------------------------------------------
+UBaseTcpConnection* UBaseBridge::CreateTcpConnection_Implementation()
+{
+    // No default implementation; must be provided by subclass.
+    return nullptr;
+}
+
 void UBaseBridge::Tick(float DeltaTime)
 {
-    // Just call UpdateRL. Subclasses override UpdateRL_Implementation with their logic.
     UpdateRL(DeltaTime);
 }
 
