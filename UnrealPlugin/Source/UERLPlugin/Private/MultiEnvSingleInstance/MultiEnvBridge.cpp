@@ -20,6 +20,7 @@ void UMultiEnvBridge::InitializeEnvironments(int32 InNumEnvironments, bool bInIn
     // Initialize each environment's state.
     for (int32 i = 0; i < NumEnvironments; i++)
     {
+
         bIsActionRunning[i] = false;
     }
 }
@@ -30,7 +31,7 @@ void UMultiEnvBridge::InitializeEnvironments(int32 InNumEnvironments, bool bInIn
 void UMultiEnvBridge::SendHandshake_Implementation()
 {
     // Here we override the base handshake to indicate multi-env specifics.
-    FString HandshakeMessage = FString::Printf(TEXT("CONFIG:ENV_TYPE=MULTI;ENV_COUNT=%d;OBS=%d;ACT=%d"),
+    FString HandshakeMessage = FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d;ENV_TYPE=MULTI;ENV_COUNT=%d"),
         NumEnvironments, ObservationSpaceSize, ActionSpaceSize);
     SendData(HandshakeMessage);
     UE_LOG(LogTemp, Log, TEXT("[UMultiEnvBridge] Multi-Env handshake sent: %s"), *HandshakeMessage);
@@ -79,7 +80,7 @@ void UMultiEnvBridge::UpdateRL_Implementation(float DeltaTime)
 
         if (!PythonMessage.IsEmpty())
         {
-            
+
             TArray<FString> actionMsgArray;
             PythonMessage.ParseIntoArray(actionMsgArray, TEXT("||"), true);
 
@@ -90,15 +91,16 @@ void UMultiEnvBridge::UpdateRL_Implementation(float DeltaTime)
                 {
                     // reset if simulation is done
                     HandleResetForEnv(EnvId);
+                    bIsActionRunning[EnvId] = false;
                 }
                 else {
                     // interpret response and apply given actions
                     HandleResponseActionsForEnv(EnvId, ActionString);
                     bIsActionRunning[EnvId] = true;
                 }
-         
+
             }
-          
+
         }
         for (int i = 0; i < bIsActionRunning.Num(); i++) {
             if (bIsActionRunning[i] == true) {
@@ -119,6 +121,8 @@ void UMultiEnvBridge::UpdateRL_Implementation(float DeltaTime)
 
             }
         }
+        // since python code now handles reading on a seperate thread i dont think we acutally need this anymore?
+        // can just send as individual strings
         if (!StateString.IsEmpty()) {
             SendData(StateString);
         }
