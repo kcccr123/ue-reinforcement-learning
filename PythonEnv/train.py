@@ -54,7 +54,6 @@ def create_gym_env(ip=ENV_IP, port=ENV_PORT):
 
     # Parse the handshake. Expected format:
     # "CONFIG:OBS=<obs_shape>;ACT=<act_shape>;[ENV_TYPE=<type>;ENV_COUNT=<n>]"
-    # In this reverted version, we ignore any multi-env configuration.
     try:
         config_body = handshake.split("CONFIG:")[1]
         parts = config_body.split(";")
@@ -67,8 +66,7 @@ def create_gym_env(ip=ENV_IP, port=ENV_PORT):
         print(f"[Factory] Error parsing handshake: {e}")
         sock.close()
         return None
-
-    # Always use GymWrapperGeneral.
+    
     env = GymWrapperGeneral(ip=ip, port=port, sock=sock, use_external_handshake=True)
     env.obs_shape = obs_shape
     env.act_shape = act_shape

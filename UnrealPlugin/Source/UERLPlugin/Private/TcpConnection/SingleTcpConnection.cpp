@@ -55,11 +55,6 @@ void USingleTcpConnection::StartAcceptThread()
     }
 }
 
-void USingleTcpConnection::SendHandshake()
-{
-    SendMessageAdmin(HandshakeMessage);
-}
-
 bool USingleTcpConnection::AcceptEnvConnection(FSocket* InNewSocket)
 {
     if (EnvSocket)

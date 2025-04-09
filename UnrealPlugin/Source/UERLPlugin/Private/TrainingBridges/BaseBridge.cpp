@@ -1,6 +1,7 @@
-// BaseBridge.cpp
+// Fill out your copyright notice in the Description page of Project Settings.
 
-#include "BaseBridge.h"
+
+#include "TrainingBridges/BaseBridge.h"
 #include "UERLPlugin/Helpers/BPFL_DataHelpers.h"
 
 bool UBaseBridge::Connect_Implementation(const FString& IPAddress, int32 Port, int32 InActionSpaceSize, int32 InObservationSpaceSize)
@@ -16,6 +17,7 @@ bool UBaseBridge::Connect_Implementation(const FString& IPAddress, int32 Port, i
             UE_LOG(LogTemp, Error, TEXT("[UBaseBridge] CreateTcpConnection returned null. Please override CreateTcpConnection in C++ or Blueprint."));
             return false;
         }
+        TcpConnection->SetHandshake(BuildHandshake());
     }
 
     if (!TcpConnection->StartListening(IPAddress, Port))
@@ -24,13 +26,6 @@ bool UBaseBridge::Connect_Implementation(const FString& IPAddress, int32 Port, i
         return false;
     }
 
-    if (!TcpConnection->IsConnected())
-    {
-        UE_LOG(LogTemp, Error, TEXT("[UBaseBridge] No client connected after StartListening."));
-        return false;
-    }
-
-    SendHandshake();
     return true;
 }
 
@@ -43,11 +38,9 @@ void UBaseBridge::Disconnect()
     }
 }
 
-void UBaseBridge::SendHandshake_Implementation()
+FString UBaseBridge::BuildHandshake_Implementation()
 {
-    const FString Msg = FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d"), ObservationSpaceSize, ActionSpaceSize);
-    SendData(Msg);
-    UE_LOG(LogTemp, Log, TEXT("[UBaseBridge] Handshake sent: %s"), *Msg);
+    return FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d"), ObservationSpaceSize, ActionSpaceSize);
 }
 
 void UBaseBridge::StartTraining()
@@ -129,3 +122,4 @@ TStatId UBaseBridge::GetStatId() const
 {
     RETURN_QUICK_DECLARE_CYCLE_STAT(UBaseBridge, STATGROUP_Tickables);
 }
+

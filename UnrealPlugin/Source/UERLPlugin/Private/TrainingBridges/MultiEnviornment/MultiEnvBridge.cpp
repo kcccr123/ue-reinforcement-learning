@@ -1,4 +1,4 @@
-#include "MultiEnvSingleInstance/MultiEnvBridge.h"
+ï»¿#include "TrainingBridges/MultiEnviornment/MultiEnvBridge.h"
 #include "Misc/Parse.h"
 #include "UERLPlugin/Helpers/PythonMsgParsingHelpers.h"
 #include "HAL/PlatformProcess.h"
@@ -25,45 +25,10 @@ void UMultiEnvBridge::InitializeEnvironments(int32 InNumEnvironments, bool bInIn
     }
 }
 
-// -------------------------------------------------------------------------
-// Overridden Handshake: Inform Python this is a multi-env configuration
-// -------------------------------------------------------------------------
-void UMultiEnvBridge::SendHandshake_Implementation()
+FString UMultiEnvBridge::BuildHandshake_Implementation()
 {
-    // Here we override the base handshake to indicate multi-env specifics.
-    FString HandshakeMessage = FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d;ENV_TYPE=MULTI;ENV_COUNT=%d"),
-        NumEnvironments, ObservationSpaceSize, ActionSpaceSize);
-    SendData(HandshakeMessage);
-    UE_LOG(LogTemp, Log, TEXT("[UMultiEnvBridge] Multi-Env handshake sent: %s"), *HandshakeMessage);
-}
-
-// -------------------------------------------------------------------------
-// Environment Callbacks – Default empty implementations (to be overridden by the user)
-// -------------------------------------------------------------------------
-FString UMultiEnvBridge::CreateStateStringForEnv_Implementation(int32 EnvId)
-{
-    return FString();
-}
-
-float UMultiEnvBridge::CalculateRewardForEnv_Implementation(int32 EnvId, bool& bDone)
-{
-    bDone = false;
-    return 0.0f;
-}
-
-void UMultiEnvBridge::HandleResetForEnv_Implementation(int32 EnvId)
-{
-    // Empty by default.
-}
-
-void UMultiEnvBridge::HandleResponseActionsForEnv_Implementation(int32 EnvId, const FString& Actions)
-{
-    // Empty by default.
-}
-
-bool UMultiEnvBridge::IsActionRunningForEnv_Implementation(int32 EnvId)
-{
-    return false;
+   return FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d;ENV_TYPE=MULTI;ENV_COUNT=%d"),
+        ObservationSpaceSize, ActionSpaceSize, NumEnvironments);
 }
 
 // -------------------------------------------------------------------------
@@ -146,4 +111,32 @@ void UMultiEnvBridge::UpdateRL_Implementation(float DeltaTime)
 
     }
 
+}
+
+
+// -------------------------------------------------------------------------
+// Environment Callbacks
+// -------------------------------------------------------------------------
+FString UMultiEnvBridge::CreateStateStringForEnv_Implementation(int32 EnvId)
+{
+    return FString();
+}
+
+float UMultiEnvBridge::CalculateRewardForEnv_Implementation(int32 EnvId, bool& bDone)
+{
+    bDone = false;
+    return 0.0f;
+}
+
+void UMultiEnvBridge::HandleResetForEnv_Implementation(int32 EnvId)
+{
+}
+
+void UMultiEnvBridge::HandleResponseActionsForEnv_Implementation(int32 EnvId, const FString& Actions)
+{
+}
+
+bool UMultiEnvBridge::IsActionRunningForEnv_Implementation(int32 EnvId)
+{
+    return false;
 }

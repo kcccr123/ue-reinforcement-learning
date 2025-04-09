@@ -19,7 +19,7 @@ public:
     virtual ~UBaseTcpConnection() override { CloseConnection(); }
 
     //--------------------------------------------------------------------------
-    // Mandatory interface methods
+    // Interface methods
     //--------------------------------------------------------------------------
 
     /**
@@ -28,8 +28,6 @@ public:
      */
     virtual bool StartListening(const FString& IPAddress, int32 Port) PURE_VIRTUAL(UBaseTcpConnection::StartListening, return false;);
 
-    /** Spawn an acceptance thread. */
-    virtual void StartAcceptThread() PURE_VIRTUAL(UBaseTcpConnection::StartAcceptThread, );
 
     /**
      * Accept an incoming connection from the listening socket.
@@ -47,8 +45,11 @@ public:
     /** Closes sockets, stops threads, and cleans up resources. */
     virtual void CloseConnection() PURE_VIRTUAL(UBaseTcpConnection::CloseConnection, );
 
-    /** Subclasses must implement how they send a handshake to the admin client. */
-    virtual void SendHandshake() PURE_VIRTUAL(UBaseTcpConnection::SendHandshake, );
+    /** Sets handshake message */
+    void SetHandshake(const FString& InHandshakeMsg);
+
+    // Get listening socket
+    FSocket* GetListeningSocket();
 
     //--------------------------------------------------------------------------
     // Admin vs. Environment messaging
@@ -81,12 +82,7 @@ public:
      */
     virtual bool IsConnected() const PURE_VIRTUAL(UBaseTcpConnection::IsConnected, return false;);
 
-    // Get listening socket
-    FSocket* GetListeningSocket();
-
-    void SetHandshake(const FString& InHandshakeMsg);
-    
-
+  
 protected:
 
     // Handshakestring
@@ -99,6 +95,13 @@ protected:
 
     // Accept thread
     FRunnableThread* AcceptThreadRef = nullptr;
-    TSharedPtr<FAcceptRunnable> AcceptRunnableRef;
+    TSharedPtr<FAcceptRunnable> AcceptRunnableRef = nullptr;
     bool bStopAcceptThreadRef = false;
+
+    // Sends handshake message
+    void SendHandshake();
+
+    /** Spawn an acceptance thread. */
+    virtual void StartAcceptThread() PURE_VIRTUAL(UBaseTcpConnection::StartAcceptThread, );
+
 };
