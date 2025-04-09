@@ -97,9 +97,12 @@ FSocket* UBaseTcpConnection::GetListeningSocket()
     return ListeningSocket;
 }
 
+void UBaseTcpConnection::SendHandshake()
+{
+    SendMessageAdmin(HandshakeMessage);
+}
 
 void UBaseTcpConnection::SetHandshake(const FString& InHandshakeMsg)
 {
     HandshakeMessage = InHandshakeMsg;
 }
-

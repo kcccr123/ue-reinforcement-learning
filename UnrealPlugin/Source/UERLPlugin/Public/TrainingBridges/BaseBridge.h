@@ -61,7 +61,7 @@ public:
 
 
     // -------------------------------------------------------------
-    //  Inference (Local Model)
+    //  Inference 
     // -------------------------------------------------------------
 
     /**
@@ -72,8 +72,7 @@ public:
     virtual bool SetInferenceInterface(UInferenceInterface* Interface);
 
     /**
-     * Run local model inference on a given observation string
-     * (implementation depends on the InferenceInterface).
+     * Run embedded model inference on a given observation string
      */
     UFUNCTION(BlueprintCallable, Category = "Bridge|Inference")
     virtual FString RunLocalModelInference(const FString& Observation);
@@ -136,8 +135,8 @@ protected:
      * Sends a handshake message that sets up training on Python Module (subclasses may override).
      */
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Bridge|Connection")
-    void SendHandshake();
-    virtual void SendHandshake_Implementation();
+    FString BuildHandshake();
+    virtual FString BuildHandshake_Implementation();
 
     /**
      * Factory for the TCP connection object.

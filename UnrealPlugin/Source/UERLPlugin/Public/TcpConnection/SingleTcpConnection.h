@@ -21,9 +21,6 @@ public:
     // Listen on IP/Port, spawn acceptance thread
     virtual bool StartListening(const FString& IPAddress, int32 Port) override;
 
-    // Single-env handshake, e.g. "CONFIG:ENV=1"
-    virtual void SendHandshake() override;
-
     // Accept environment connection
     virtual bool AcceptEnvConnection(FSocket* InNewSocket) override;
 

@@ -1,14 +1,12 @@
-#pragma once
+ï»¿#pragma once
 
 #include "CoreMinimal.h"
-#include "BaseBridge.h"
+#include "TrainingBridges/BaseBridge.h"
 #include "MultiEnvBridge.generated.h"
 
 /**
- * UMultiEnvBridge
- *
  * A multi-environment RL bridge, inherits from BaseBridge.
- * This class implements a multi-env update loop and manages per-environment state using internal TArrays.
+ * This class implements a multi-env update loop and sends per-enviornment updates when actions complete
  */
 UCLASS(Blueprintable)
 class UERLPLUGIN_API UMultiEnvBridge : public UBaseBridge
@@ -40,15 +38,13 @@ public:
 
 protected:
     // Override handshake to send multi enviornment configuration settngs
-    virtual void SendHandshake_Implementation() override;
+    virtual FString BuildHandshake_Implementation() override;
 
-    // -------------------------------------------------------------
-    //  RL Loop: UpdateRL Implementation
-    // -------------------------------------------------------------
+    // Training loop 
     virtual void UpdateRL_Implementation(float DeltaTime) override;
 
     // -------------------------------------------------------------
-    //  Environment Callbacks – To be overridden by the user
+    //  Environment Callbacks
     // -------------------------------------------------------------
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "MultiEnv|Environment")
     FString CreateStateStringForEnv(int32 EnvId);
