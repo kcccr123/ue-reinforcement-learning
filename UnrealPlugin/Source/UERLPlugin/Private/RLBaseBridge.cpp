@@ -66,7 +66,7 @@ bool URLBaseBridge::Connect(const FString& IPAddress, int32 port, int32 actionSp
     // Close the listening socket and replace it with the accepted client socket.
     ConnectionSocket->Close();
     SocketSubsystem->DestroySocket(ConnectionSocket);
-    ConnectionSocket = ClientSocket;
+    ConnectionSocket = ClientSocket;    
 
     UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Accepted connection"));
 
@@ -81,7 +81,7 @@ bool URLBaseBridge::Connect(const FString& IPAddress, int32 port, int32 actionSp
 
 void URLBaseBridge::SendHandshake_Implementation()
 {
-    FString HandshakeMessage = FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d"), ObservationSpaceSize, ActionSpaceSize);
+    FString HandshakeMessage = FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d;ENV_TYPE=RLBASE;"), ObservationSpaceSize, ActionSpaceSize);
 
     bool bSent = SendData(HandshakeMessage);
     if (bSent)
@@ -157,7 +157,7 @@ void URLBaseBridge::UpdateRL(float DeltaTime)
                 float Reward = CalculateReward(bDone);
                 int32 DoneInt = bDone ? 1 : 0;
 
-                // Combine both into one state string (using a delimiter, e.g., semicolon)
+                // Combine both into obs string 
                 FString DataToSend = FString::Printf(TEXT("%s%.2f;%d"), *CreateStateString(), Reward, DoneInt);
 
                 // ---------------------- MAKE STATE STRING ---------------------------------
