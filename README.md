@@ -44,8 +44,8 @@ Made for both developers and non-programmers, the framework supports native code
 
 Features a minimal setup process to get you started fast. The design makes it straightforward to set up training environments and experiment with different reinforcement learning algorithms without hassle.
 
-Below is an library overview video demonstrating an implementation of the framework with a basic example.  
-You can find more information and documentation at the [GitHub repository wiki](https://github.com/kcccr123/ue-reinforcement-learning/wiki).
+**You can find more information and documentation at the [GitHub repository wiki](https://github.com/kcccr123/ue-reinforcement-learning/wiki).**
+Below is a library overview video demonstrating an implementation of the framework with a basic example.  
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=M2tfriFZwVQ" target="_blank">
