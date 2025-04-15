@@ -346,7 +346,9 @@ bool UMultiTcpConnection::AreAllEnvsAssigned() const
 {
     // might wanna remove this later
     // this means were looping through the entire array every single tick since
-    // we call i
+    // probably really slows down performance (YIKES)
+    // maybe replace in future with a counter that checks how many envs are connnected
+    // or perodic heartbeats that check if envs are connected. (when recieving data)
     for (FSocket* Sock : EnvSockets)
     {
         if (!Sock)
