@@ -46,7 +46,6 @@ public:
 
     /**
      * Gather new messages from all environment sockets. We parse partial data with "||",
-     * returning them in a single combined string that ends in "||".
      */
     virtual FString ReceiveMessageEnv(int32 BufSize = 1024) override;
 
