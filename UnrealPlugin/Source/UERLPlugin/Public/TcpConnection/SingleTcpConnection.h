@@ -8,7 +8,7 @@ class FAcceptRunnable;
 class FSocket;
 
 /**
- * Single-environment TCP connection:
+ * Basic Single-environment TCP connection:
  */
 UCLASS()
 class UERLPLUGIN_API USingleTcpConnection : public UBaseTcpConnection
