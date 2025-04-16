@@ -1,7 +1,16 @@
 ﻿#include "TrainingBridges/MultiEnviornment/MultiEnvBridge.h"
 #include "Misc/Parse.h"
+#include "TcpConnection/MultiTcpConnection.h"    
 #include "UERLPlugin/Helpers/PythonMsgParsingHelpers.h"
 #include "HAL/PlatformProcess.h"
+
+UBaseTcpConnection* UMultiEnvBridge::CreateTcpConnection_Implementation()
+{
+    // set num of environments after creation
+    UMultiTcpConnection * newBridge = NewObject<UMultiTcpConnection>(this, UMultiTcpConnection::StaticClass());
+    newBridge->NumEnvironments = NumEnvironments;
+    return newBridge;
+}
 
 void UMultiEnvBridge::InitializeEnvironments(int32 InNumEnvironments, bool bInInferenceMode)
 {
@@ -78,7 +87,7 @@ void UMultiEnvBridge::UpdateRL_Implementation(float DeltaTime)
                     float Reward = CalculateRewardForEnv(i, bDone);
                     int32 DoneInt = bDone ? 1 : 0;
 
-                    FString Response = FString::Printf(TEXT("OBS=%s;REW=%.2f;DONE=%d;ENV=%d||"),
+                    FString Response = FString::Printf(TEXT("OBS=%s;REW=%.2f;DONE=%d;ENV=%d"),
                         *CreateStateStringForEnv(i), Reward, DoneInt, i);
                     StateString += Response;
                     // ---------------------- MAKE STATE STRING ---------------------------------

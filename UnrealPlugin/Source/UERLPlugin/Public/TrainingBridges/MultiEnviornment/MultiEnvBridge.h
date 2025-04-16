@@ -14,6 +14,10 @@ class UERLPLUGIN_API UMultiEnvBridge : public UBaseBridge
     GENERATED_BODY()
 
 protected:
+
+    // Implement factory function for creating
+    UBaseTcpConnection* CreateTcpConnection_Implementation() override;
+
     // -------------------------------------------------------------
     //  Multi-Environment Properties
     // -------------------------------------------------------------
