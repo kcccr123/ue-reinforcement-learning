@@ -50,7 +50,9 @@ if __name__ == "__main__":
         print("[Training] RLBASE => reusing AdminManager socket for single environment.")
         # Construct single environment with RLBASE socket
         # RLBaseBridge uses the admin socket directly for simplicity
-        vec_env = DummyVecEnv([GymWrapperGeneral(sock=admin.sock, obs_shape=obs_shape, act_shape=act_shape)])
+        def make_env():
+            return GymWrapperGeneral(sock=admin.sock, obs_shape=obs_shape, act_shape=act_shape)
+        vec_env = DummyVecEnv([make_env])
 
     elif env_type == "SINGLE":
         print("[Training] SINGLE => create new socket for single environment, close admin socket.")
