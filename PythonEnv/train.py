@@ -1,10 +1,8 @@
-import numpy as np
-import socket
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv
-from gymnasium import spaces
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
-# Import only GymWrapperGeneral.
+from sockets.admin_manager import AdminManager
+from sockets.socket_factory import create_unreal_socket
 from gym_wrappers.gym_wrapper_general import GymWrapperGeneral
 
 # -------------------- CONSTANTS -------------------- #
@@ -19,87 +17,88 @@ BATCH_SIZE = 128            # Mini-batch size for PPO updates
 ENT_COEF = 0.01             # Entropy coefficient
 GAE_LAMBDA = 0.95           # GAE lambda
 CLIP_RANGE = 0.2            # PPO clipping parameter
-VF_COEF = 0.5              # Value function loss coefficient
+VF_COEF = 0.5               # Value function loss coefficient
 MAX_GRAD_NORM = 0.5         # Gradient clipping
 
 MODEL_NAME = "model"        # Model filename prefix
 
-# -------------------- FACTORY FUNCTION -------------------- #
-def create_gym_env(ip=ENV_IP, port=ENV_PORT):
-    # Create a socket and connect.
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        sock.connect((ip, port))
-        print(f"[Factory] Connected to {ip}:{port}")
-    except Exception as e:
-        print(f"[Factory] Failed to connect: {e}")
-        return None
-
-    # Receive handshake message until the "STEP" delimiter is encountered.
-    recv_buffer = ""
-    bufsize = 1024
-    while "STEP" not in recv_buffer:
-        data = sock.recv(bufsize)
-        if not data:
-            break
-        recv_buffer += data.decode('utf-8')
-    if "STEP" in recv_buffer:
-        handshake, remaining = recv_buffer.split("STEP", 1)
-        handshake = handshake.strip()
-        print(f"[Factory] Handshake received: {handshake}")
-    else:
-        print("[Factory] No valid handshake received.")
-        sock.close()
-        return None
-
-    # Parse the handshake. Expected format:
-    # "CONFIG:OBS=<obs_shape>;ACT=<act_shape>;[ENV_TYPE=<type>;ENV_COUNT=<n>]"
-    try:
-        config_body = handshake.split("CONFIG:")[1]
-        parts = config_body.split(";")
-        obs_part = parts[0]  # e.g., "OBS=7"
-        act_part = parts[1]  # e.g., "ACT=6"
-        obs_shape = int(obs_part.split("=")[1])
-        act_shape = int(act_part.split("=")[1])
-        print(f"[Factory] Parsed handshake: obs_shape={obs_shape}, act_shape={act_shape}")
-    except Exception as e:
-        print(f"[Factory] Error parsing handshake: {e}")
-        sock.close()
-        return None
-    
-    env = GymWrapperGeneral(ip=ip, port=port, sock=sock, use_external_handshake=True)
-    env.obs_shape = obs_shape
-    env.act_shape = act_shape
-    env.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_shape,), dtype=np.float32)
-    env.action_space = spaces.Box(low=-1.0, high=1.0, shape=(act_shape,), dtype=np.float32)
-    print("[Factory] Using GymWrapperGeneral.")
-    return env
-
-def make_env():
-    return create_gym_env()
-
 # -------------------- TRAINING SCRIPT -------------------- #
-env = DummyVecEnv([make_env])
+if __name__ == "__main__":
 
-model = PPO(
-    "MlpPolicy",
-    env,
-    verbose=1,
-    learning_rate=LEARNING_RATE,
-    gamma=GAMMA,
-    n_steps=N_STEPS,
-    batch_size=BATCH_SIZE,
-    ent_coef=ENT_COEF,
-    gae_lambda=GAE_LAMBDA,
-    clip_range=CLIP_RANGE,
-    vf_coef=VF_COEF,
-    max_grad_norm=MAX_GRAD_NORM
-)
+    # Initialize and connect the AdminManager
+    admin = AdminManager(ip=ENV_IP, port=ENV_PORT)
+    admin.connect()
 
-model.learn(total_timesteps=TOTAL_TIMESTEPS)
-model.save(MODEL_NAME)
-print(f"Model saved as '{MODEL_NAME}'")
+    # Block until we receive a valid handshake (ENV_TYPE, OBS, ACT, ENV_COUNT).
+    # Meanwhile, any other commands that come in will be processed in dispatch.
+    env_type, obs_shape, act_shape, env_count = admin.wait_for_handshake()
 
-env.envs[0].send_data("TRAINING_COMPLETE")
-print("Training done")
-env.close()
+    # Check for handshake errors
+    if env_type is None:
+        print("[Training] Could not complete handshake. Exiting.")
+        admin.close()
+        exit(1) 
+
+    # if observation space or action space is size 0 raise error
+    if obs_shape == 0 or act_shape == 0:
+        admin.close()
+        raise ValueError("Handshake error: obs_shape and act_shape must be non-zero. "
+                         f"Received OBS={obs_shape}, ACT={act_shape}")
+
+    # Create the environment(s) based on env_type
+    if env_type == "RLBASE":
+        print("[Training] RLBASE => reusing AdminManager socket for single environment.")
+        # Construct single environment with RLBASE socket
+        # RLBaseBridge uses the admin socket directly for simplicity
+        def make_env():
+            return GymWrapperGeneral(sock=admin.sock, obs_shape=obs_shape, act_shape=act_shape)
+        vec_env = DummyVecEnv([make_env])
+
+    elif env_type == "SINGLE":
+        print("[Training] SINGLE => create new socket for single environment, close admin socket.")
+        new_sock = create_unreal_socket(ENV_IP, ENV_PORT)
+        # for use with SingleTcpConnection and SingleEnvBridge
+
+    elif env_type == "MULTI":
+        print(f"[Training] MULTI => create {env_count} sub-environments, close admin socket.")
+
+        def make_env(i):
+            sock = create_unreal_socket(ENV_IP, ENV_PORT)
+            # for use with MultiTcpConnection and MultiEnvBridge
+
+        env_fns = [lambda i=i: make_env(i) for i in range(env_count)]
+        vec_env = SubprocVecEnv(env_fns)
+
+    else:
+        raise ValueError("Handshake error: Unknown enviornment type. ")
+    
+    # Create the model (by default ppo, add your own if you want)
+    model = PPO(
+        "MlpPolicy",
+        vec_env,
+        verbose=1,
+        learning_rate=LEARNING_RATE,
+        gamma=GAMMA,
+        n_steps=N_STEPS,
+        batch_size=BATCH_SIZE,
+        ent_coef=ENT_COEF,
+        gae_lambda=GAE_LAMBDA,
+        clip_range=CLIP_RANGE,
+        vf_coef=VF_COEF,
+        max_grad_norm=MAX_GRAD_NORM
+    )
+
+    # Train the model
+    model.learn(total_timesteps=TOTAL_TIMESTEPS)
+    model.save(MODEL_NAME)
+    print(f"[Training] Model saved as '{MODEL_NAME}'")
+
+    # Notify Unreal that training is complete through admin connection:
+    try:
+        vec_env.envs[0].send_data("TRAINING_COMPLETESTEP")
+    except Exception as e:
+        print("[Training] Could not send TRAINING_COMPLETESTEP:", e)
+
+    admin.close()
+    vec_env.close()
+    print("[Training] Done")

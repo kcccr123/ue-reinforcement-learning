@@ -84,9 +84,16 @@ bool USingleTcpConnection::SendMessageEnv(const FString& Data)
         return false;
     }
 
-    FTCHARToUTF8 Converter(*Data);
+    // Append "STEP" delimiter
+    FString DataWithStep = Data + TEXT("STEP");
+
+    FTCHARToUTF8 Converter(*DataWithStep);
     int32 BytesSent = 0;
-    bool bSuccess = EnvSocket->Send(reinterpret_cast<const uint8*>(Converter.Get()), Converter.Length(), BytesSent);
+    bool bSuccess = EnvSocket->Send(
+        reinterpret_cast<const uint8*>(Converter.Get()),
+        Converter.Length(),
+        BytesSent
+    );
 
     if (!bSuccess || BytesSent <= 0)
     {
@@ -94,9 +101,10 @@ bool USingleTcpConnection::SendMessageEnv(const FString& Data)
         return false;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Sent to env => %s"), *Data);
+    UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Sent to env => %s"), *DataWithStep);
     return true;
 }
+
 
 FString USingleTcpConnection::ReceiveMessageEnv(int32 BufSize)
 {
