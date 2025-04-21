@@ -50,8 +50,6 @@ void UMultiEnvBridge::UpdateRL_Implementation(float DeltaTime)
         // receive response
         FString PythonMessage = ReceiveData();
 
-        FString StateString;
-
         if (!PythonMessage.IsEmpty())
         {
 
@@ -89,16 +87,11 @@ void UMultiEnvBridge::UpdateRL_Implementation(float DeltaTime)
 
                     FString Response = FString::Printf(TEXT("OBS=%s;REW=%.2f;DONE=%d;ENV=%d"),
                         *CreateStateStringForEnv(i), Reward, DoneInt, i);
-                    StateString += Response;
+                    SendData(Response);
                     // ---------------------- MAKE STATE STRING ---------------------------------
                 }
 
             }
-        }
-        // since python code now handles reading on a seperate thread i dont think we acutally need this anymore?
-        // can just send as individual strings
-        if (!StateString.IsEmpty()) {
-            SendData(StateString);
         }
     }
     else if (bIsInference) {

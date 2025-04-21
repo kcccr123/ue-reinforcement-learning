@@ -2,9 +2,9 @@ import numpy as np
 from gymnasium import spaces
 from .gym_wrapper_base import GymWrapperBase
 
-class GymWrapperGeneral(GymWrapperBase):
+class GymWrapperRLBase(GymWrapperBase):
     """
-    A generic Gym environment that uses an existing TCP socket to
+    A Gym environment that uses an existing TCP socket to
     communicate with Unreal. No handshake or connection logic here—
     those tasks are done externally.
     """
@@ -79,6 +79,6 @@ class GymWrapperGeneral(GymWrapperBase):
             return obs, reward, done
 
         except Exception as e:
-            print("[GymWrapperGeneral] Error parsing state:", e)
+            print("Error parsing state:", e)
             default_obs = np.zeros(self.observation_space.shape, dtype=np.float32)
             return default_obs, 0.0, True
