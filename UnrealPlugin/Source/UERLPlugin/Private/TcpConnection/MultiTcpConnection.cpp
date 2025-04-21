@@ -1,4 +1,4 @@
-#include "TcpConnection/MultiTcpConnection.h"
+﻿#include "TcpConnection/MultiTcpConnection.h"
 #include "Common/TcpSocketBuilder.h"
 #include "SocketSubsystem.h"
 #include "TcpConnection/Threads/AcceptRunnable.h"
@@ -93,6 +93,10 @@ bool UMultiTcpConnection::AcceptEnvConnection(FSocket* InNewSocket)
 
 bool UMultiTcpConnection::SendMessageEnv(const FString& Data)
 {
+   
+    // % TODO: MIGHT WANT TO CONSIDER MAKING A NEW MESSAGE FUNCTION FOR MULTITCPCONNECTIONS THAT TAKES
+    // ENV ID'S INSTEAD OF THIS GARBAGE THAT EXTRACTS THE ENVID FROM THE STRING
+
     // Parse "ENV=%d" from Data to figure out which environment socket to target
     int32 EnvId = ExtractEnvIdFromData(Data);
     if (EnvId < 0)
@@ -112,7 +116,7 @@ bool UMultiTcpConnection::SendMessageEnv(const FString& Data)
     FSocket* EnvSock = EnvSockets[EnvId];
 
     // Append "STEP" delimiter
-    FString DataWithStep = Data + TEXT("STEP");
+    FString DataWithStep = Data + TEXT("\n");
 
     FTCHARToUTF8 Converter(*DataWithStep);
     int32 BytesSent = 0;
@@ -148,9 +152,11 @@ FString UMultiTcpConnection::ReceiveMessageEnv(int32 BufSize)
             {
                 continue;
             }
-
-            TArray<FString> NewMsgs = ReadFromSocket(i, EnvSock, BufSize);
-            AllMessages.Append(NewMsgs);
+            FString line = ReadFromSocket(i, EnvSock, BufSize);
+            if (!line.IsEmpty()) {
+                AllMessages.Add(line);
+            }
+      
         }
     }
 
@@ -247,98 +253,63 @@ bool UMultiTcpConnection::IsConnected() const
     return AdminSocket && AreAllEnvsAssigned();
 }
 
-TArray<FString> UMultiTcpConnection::ReadFromSocket(int32 EnvId, FSocket* EnvSocket, int32 BufSize)
+FString UMultiTcpConnection::ReadFromSocket(int32 EnvId, FSocket* EnvSocket, int32 BufSize)
 {
-    TArray<FString> CompletedMessages;
+
     if (!EnvSocket)
     {
-        return CompletedMessages;
+        UE_LOG(LogTemp, Error, TEXT("Bridge: No connection socket available for receiving."));
+        return TEXT("");
     }
 
-    uint32 PendingSize = 0;
-    if (!EnvSocket->HasPendingData(PendingSize) || PendingSize == 0)
+    // Read any new bytes into PartialData
+    uint32 Pending = 0;
+    if (EnvSocket->HasPendingData(Pending) && Pending > 0)
     {
-        return CompletedMessages;
-    }
-
-    TArray<uint8> DataBuffer;
-    DataBuffer.SetNumUninitialized(FMath::Min(static_cast<int32>(PendingSize), BufSize));
-
-    int32 BytesRead = 0;
-    bool bOk = EnvSocket->Recv(DataBuffer.GetData(), DataBuffer.Num(), BytesRead);
-    if (!bOk || BytesRead <= 0)
-    {
-        return CompletedMessages;
-    }
-
-    FString Incoming = FString(UTF8_TO_TCHAR(reinterpret_cast<const char*>(DataBuffer.GetData())));
-
-    FString& PartialRef = PartialData[EnvId];
-    Incoming = PartialRef + Incoming;
-
-    ParseBufferIntoMessages(Incoming, CompletedMessages, PartialRef);
-    return CompletedMessages;
-}
-
-void UMultiTcpConnection::ParseBufferIntoMessages(const FString& InBuffer, TArray<FString>& OutMessages, FString& OutPartial)
-{
-    TArray<FString> Tokens;
-    InBuffer.ParseIntoArray(Tokens, TEXT("||"), true);
-
-    if (Tokens.Num() == 0)
-    {
-        // no delimiter => entire data is partial
-        OutPartial = InBuffer;
-        return;
-    }
-
-    const bool bEndsWithDelimiter = InBuffer.EndsWith(TEXT("||"));
-
-    for (int32 i = 0; i < Tokens.Num(); i++)
-    {
-        const bool bIsLastToken = (i == Tokens.Num() - 1);
-        if (bIsLastToken && !bEndsWithDelimiter)
+        TArray<uint8> Buffer;
+        Buffer.SetNumUninitialized(FMath::Min((int32)Pending, BufSize));
+        int32 Read = 0;
+        if (EnvSocket->Recv(Buffer.GetData(), Buffer.Num(), Read) && Read > 0)
         {
-            // leftover partial
-            OutPartial = Tokens[i];
-        }
-        else
-        {
-            // complete message
-            OutMessages.Add(Tokens[i]);
+            PartialData[EnvId] += FString(UTF8_TO_TCHAR(reinterpret_cast<const char*>(Buffer.GetData())));
         }
     }
+
+    // If we have a full line ending in '\n', extract it
+    int32 NewlineIdx;
+    if (PartialData[EnvId].FindChar('\n', NewlineIdx))
+    {
+        FString Line = PartialData[EnvId].Left(NewlineIdx);
+        PartialData[EnvId] = PartialData[EnvId].Mid(NewlineIdx + 1);
+        UE_LOG(LogTemp, Log, TEXT("[UMultiTcpConnection] Env %d Received: %s"), EnvId, *Line);
+        return Line;
+    }
+
+    return TEXT("");
 }
 
 
-int32 UMultiTcpConnection::ExtractEnvIdFromData(const FString& Message) const
-{
-    int32 EnvId = -1;
 
+
+int32 UMultiTcpConnection::ExtractEnvIdFromData(const FString& Message) const 
+{
+
+    //  Find the "ENV=" tag
     int32 StartIdx = Message.Find(TEXT("ENV="), ESearchCase::IgnoreCase, ESearchDir::FromStart);
-    if (StartIdx != INDEX_NONE)
+    if (StartIdx == INDEX_NONE)
     {
-        // Move past "ENV="
-        StartIdx += 4;
-
-        // Find the next occurrence of "||" from StartIdx
-        int32 EndIdx = Message.Find(TEXT("||"), ESearchCase::IgnoreCase, ESearchDir::FromStart, StartIdx);
-        if (EndIdx == INDEX_NONE)
-        {
-            // If "||" not found, parse until the end of the string
-            EndIdx = Message.Len();
-        }
-
-        // Ensure we have something to parse
-        if (EndIdx > StartIdx)
-        {
-            FString EnvIdStr = Message.Mid(StartIdx, EndIdx - StartIdx);
-            EnvId = FCString::Atoi(*EnvIdStr);
-        }
+        return -1;
     }
 
-    return EnvId;
+    StartIdx += 4;
+
+    int32 EndIdx = Message.Find(TEXT("\n"), ESearchCase::IgnoreCase, ESearchDir::FromStart, StartIdx);
+
+    FString EnvIdStr = Message.Mid(StartIdx, EndIdx - StartIdx).TrimStartAndEnd();
+    return FCString::Atoi(*EnvIdStr);
 }
+
+
 
 
 // Helper: check if all env slots are assigned

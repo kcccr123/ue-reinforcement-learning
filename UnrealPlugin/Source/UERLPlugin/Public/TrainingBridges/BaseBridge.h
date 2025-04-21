@@ -119,7 +119,7 @@ protected:
     // -------------------------------------------------------------
 
     /**
-     * Send data across the connection, by default appending "STEP" delimiter.
+     * Send data across the connection.
      * Subclasses can override if desired.
      */
     UFUNCTION(BlueprintCallable, Category = "Bridge|Communication")

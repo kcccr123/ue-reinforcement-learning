@@ -6,6 +6,7 @@ class AdminManager:
     Manages the 'admin' TCP connection to Unreal.
     Intended for future extensibility to handle user and 
     system requests while training is underway.
+    TCP uses and expects "\n" (newline char) as delimiter.
     """
 
     def __init__(self, ip="127.0.0.1", port=7777, bufsize=1024):
@@ -44,8 +45,8 @@ class AdminManager:
 
     def receive_msg(self):
         """
-        BLOCK until at least one full message (delimited by 'STEP') is received.
-        Return that message as a string (with 'STEP' removed).
+        BLOCK until at least one full message (delimited by '\n') is received.
+        Return that message as a string (with '\n' removed).
         If the socket closes prematurely, raises ConnectionError.
         """
         if not self.sock:
@@ -63,8 +64,8 @@ class AdminManager:
             self._recv_buffer += data.decode('utf-8')
 
             # Split out completed messages
-            while "STEP" in self._recv_buffer:
-                msg, remainder = self._recv_buffer.split("STEP", 1)
+            while "\n" in self._recv_buffer:
+                msg, remainder = self._recv_buffer.split("\n", 1)
                 msg = msg.strip()
                 self._recv_buffer = remainder
                 self._msg_queue.append(msg)

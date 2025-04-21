@@ -3,7 +3,10 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 from sockets.admin_manager import AdminManager
 from sockets.socket_factory import create_unreal_socket
-from gym_wrappers.gym_wrapper_general import GymWrapperGeneral
+
+from gym_wrappers.gym_wrapper_rl_base import GymWrapperRLBase
+from gym_wrappers.gym_wrapper_single_env import GymWrapperSingleEnv
+from gym_wrappers.gym_wrapper_multi_env import GymWrapperMultiEnv
 
 # -------------------- CONSTANTS -------------------- #
 ENV_IP = "127.0.0.1"        # Unreal TCP server IP
@@ -35,42 +38,44 @@ if __name__ == "__main__":
 
     # Check for handshake errors
     if env_type is None:
-        print("[Training] Could not complete handshake. Exiting.")
+        print("[Training] Could not complete handshake")
         admin.close()
         exit(1) 
 
     # if observation space or action space is size 0 raise error
     if obs_shape == 0 or act_shape == 0:
         admin.close()
-        raise ValueError("Handshake error: obs_shape and act_shape must be non-zero. "
+        raise ValueError("Handshake error: obs_shape and act_shape must be non-zero"
                          f"Received OBS={obs_shape}, ACT={act_shape}")
 
     # Create the environment(s) based on env_type
     if env_type == "RLBASE":
-        print("[Training] RLBASE => reusing AdminManager socket for single environment.")
+        print("[Training] RLBASE => reusing AdminManager socket for single environment")
         # Construct single environment with RLBASE socket
         # RLBaseBridge uses the admin socket directly for simplicity
         def make_env():
-            return GymWrapperGeneral(sock=admin.sock, obs_shape=obs_shape, act_shape=act_shape)
+            return GymWrapperRLBase(sock=admin.sock, obs_shape=obs_shape, act_shape=act_shape)
         vec_env = DummyVecEnv([make_env])
 
     elif env_type == "SINGLE":
-        print("[Training] SINGLE => create new socket for single environment, close admin socket.")
-        new_sock = create_unreal_socket(ENV_IP, ENV_PORT)
-        # for use with SingleTcpConnection and SingleEnvBridge
+        print("[Training] SINGLE => create new socket for single environment, close admin socket")
+        def make_env():
+            sock = create_unreal_socket(ENV_IP, ENV_PORT)
+            return GymWrapperSingleEnv(sock=sock, obs_shape=obs_shape, act_shape=act_shape)
+        vec_env = DummyVecEnv([make_env])
 
     elif env_type == "MULTI":
-        print(f"[Training] MULTI => create {env_count} sub-environments, close admin socket.")
+        print(f"[Training] MULTI => create {env_count} sub-environments, close admin socket")
 
         def make_env(i):
             sock = create_unreal_socket(ENV_IP, ENV_PORT)
-            # for use with MultiTcpConnection and MultiEnvBridge
-
+            return GymWrapperMultiEnv(sock=sock, obs_shape=obs_shape, act_shape=act_shape, env_id=i)
+        
         env_fns = [lambda i=i: make_env(i) for i in range(env_count)]
         vec_env = SubprocVecEnv(env_fns)
 
     else:
-        raise ValueError("Handshake error: Unknown enviornment type. ")
+        raise ValueError("Handshake error: Unknown enviornment type")
     
     # Create the model (by default ppo, add your own if you want)
     model = PPO(
@@ -93,12 +98,9 @@ if __name__ == "__main__":
     model.save(MODEL_NAME)
     print(f"[Training] Model saved as '{MODEL_NAME}'")
 
-    # Notify Unreal that training is complete through admin connection:
-    try:
-        vec_env.envs[0].send_data("TRAINING_COMPLETESTEP")
-    except Exception as e:
-        print("[Training] Could not send TRAINING_COMPLETESTEP:", e)
-
+    # TODO: Notify Unreal that training is complete through admin connection:
+    # NEED TO ADD SEND COMMAND FOR ADMIN SOCKET, CURRENTLY USER JUST MANUALLY CLOSES UNREAL
+    
     admin.close()
     vec_env.close()
     print("[Training] Done")
