@@ -1,4 +1,4 @@
-﻿#include "TrainingBridges/MultiEnviornment/MultiEnvBridge.h"
+#include "TrainingBridges/MultiEnvironment/MultiEnvBridge.h"
 #include "Misc/Parse.h"
 #include "TcpConnection/MultiTcpConnection.h"    
 #include "UERLPlugin/Helpers/PythonMsgParsingHelpers.h"
@@ -7,7 +7,7 @@
 UBaseTcpConnection* UMultiEnvBridge::CreateTcpConnection_Implementation()
 {
     // set num of environments after creation
-    UMultiTcpConnection * newBridge = NewObject<UMultiTcpConnection>(this, UMultiTcpConnection::StaticClass());
+    UMultiTcpConnection* newBridge = NewObject<UMultiTcpConnection>(this, UMultiTcpConnection::StaticClass());
     newBridge->NumEnvironments = NumEnvironments;
     return newBridge;
 }
@@ -36,7 +36,7 @@ void UMultiEnvBridge::InitializeEnvironments(int32 InNumEnvironments, bool bInIn
 
 FString UMultiEnvBridge::BuildHandshake_Implementation()
 {
-   return FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d;ENV_TYPE=MULTI;ENV_COUNT=%d"),
+    return FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d;ENV_TYPE=MULTI;ENV_COUNT=%d"),
         ObservationSpaceSize, ActionSpaceSize, NumEnvironments);
 }
 

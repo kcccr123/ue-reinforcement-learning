@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
-#include "Tickable.h" // For FTickableGameObject
+#include "Tickable.h"
 #include "Inference/InferenceInterfaces/InferenceInterface.h"
 #include "TcpConnection/BaseTcpConnection.h"
 #include "BaseBridge.generated.h"
