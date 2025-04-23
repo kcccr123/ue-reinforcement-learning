@@ -34,6 +34,13 @@ void USingleEnvBridge::UpdateRL_Implementation(float DeltaTime)
                 // reset if simulation is done
                 HandleReset();
                 bIsActionRunning = false;
+                bool bDone = false;
+                float Reward = CalculateReward(bDone);
+                int32 DoneInt = bDone ? 1 : 0;
+                FString ObsStr = CreateStateString();
+                FString DataToSend = FString::Printf(TEXT("OBS=%sREW=%.2f;DONE=%d"),*ObsStr, Reward, DoneInt);
+                SendData(DataToSend);
+                return;
             }
             else {
                 // interpret response and apply given actions
@@ -54,7 +61,7 @@ void USingleEnvBridge::UpdateRL_Implementation(float DeltaTime)
                 int32 DoneInt = bDone ? 1 : 0;
 
                 FString ObsStr = CreateStateString();
-                FString DataToSend = FString::Printf(TEXT("OBS=%s;REW=%.2f;DONE=%d"), *ObsStr, Reward, DoneInt);
+                FString DataToSend = FString::Printf(TEXT("OBS=%sREW=%.2f;DONE=%d"), *ObsStr, Reward, DoneInt);
 
                 // Send environment observation, reward, done to Python
                 SendData(DataToSend);

@@ -57,20 +57,34 @@ void UMultiEnvBridge::UpdateRL_Implementation(float DeltaTime)
             PythonMessage.ParseIntoArray(actionMsgArray, TEXT("||"), true);
 
             for (int i = 0; i < actionMsgArray.Num(); i++) {
+        
                 FString ActionString = UPythonMsgParsingHelpers::ParseActionString(actionMsgArray[i]);
                 int32 EnvId = UPythonMsgParsingHelpers::ParseEnvId(actionMsgArray[i]);
+                if (EnvId == -1) {
+                    SendData("PROBLEM IS HERE" + actionMsgArray[i]);
+                }
                 if (ActionString.Contains("RESET"))
                 {
                     // reset if simulation is done
                     HandleResetForEnv(EnvId);
                     bIsActionRunning[EnvId] = false;
+
+                    bool bDone = false;
+                    float Reward = CalculateRewardForEnv(EnvId, bDone);
+                    int32 DoneInt = bDone ? 1 : 0;            
+                    // PROBLEM IS HERE.
+                    // ITS RECEVING DATA FROM PYTHON ENV X
+                    // WHICH IS DEPENDENT ON THE ENV STRING FROM THE PYTHON MODULE
+                    FString Response = FString::Printf(TEXT("OBS=%sREW=%.2f;DONE=%d;ENV=%d"),
+                        *CreateStateStringForEnv(EnvId), Reward, DoneInt, EnvId);
+                    SendData(Response);
+
                 }
                 else {
                     // interpret response and apply given actions
                     HandleResponseActionsForEnv(EnvId, ActionString);
                     bIsActionRunning[EnvId] = true;
                 }
-
             }
 
         }
@@ -85,7 +99,7 @@ void UMultiEnvBridge::UpdateRL_Implementation(float DeltaTime)
                     float Reward = CalculateRewardForEnv(i, bDone);
                     int32 DoneInt = bDone ? 1 : 0;
 
-                    FString Response = FString::Printf(TEXT("OBS=%s;REW=%.2f;DONE=%d;ENV=%d"),
+                    FString Response = FString::Printf(TEXT("OBS=%sREW=%.2f;DONE=%d;ENV=%d"),
                         *CreateStateStringForEnv(i), Reward, DoneInt, i);
                     SendData(Response);
                     // ---------------------- MAKE STATE STRING ---------------------------------

@@ -16,7 +16,7 @@ class UERLPLUGIN_API UBaseTcpConnection : public UObject
     GENERATED_BODY()
 
 public:
-    virtual ~UBaseTcpConnection() override { CloseConnection(); }
+    virtual ~UBaseTcpConnection() override = default;
 
     //--------------------------------------------------------------------------
     // Interface methods

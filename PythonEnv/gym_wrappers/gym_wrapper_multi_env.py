@@ -32,8 +32,8 @@ class GymWrapperMultiEnv(GymWrapperBase):
             dtype=np.float32
         )
         self.action_space = spaces.Box(
-            low=-np.inf,
-            high=np.inf,
+            low=-1.0,
+            high=1.0,
             shape=(self.act_shape,),
             dtype=np.float32
         )
@@ -82,6 +82,7 @@ class GymWrapperMultiEnv(GymWrapperBase):
         """
         try:
             parts = [seg.strip() for seg in data.split(";")]
+            print(parts)
             kv = {k: v for k, v in (p.split("=", 1) for p in parts if "=" in p)}
 
             obs_str  = kv.get("OBS", "")
