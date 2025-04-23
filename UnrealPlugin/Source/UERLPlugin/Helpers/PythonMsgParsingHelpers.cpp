@@ -14,7 +14,7 @@ int32 UPythonMsgParsingHelpers::ParseEnvId(const FString& Message)
             return FCString::Atoi(*IdStr);
         }
     }
-
+    UE_LOG(LogTemp, Error, TEXT("PY->UE: «%s»"), *Message);
     return -1;
 }
 

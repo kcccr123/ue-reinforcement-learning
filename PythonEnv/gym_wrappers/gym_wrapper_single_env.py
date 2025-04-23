@@ -20,7 +20,7 @@ class GymWrapperSingleEnv(GymWrapperBase):
         """
         super().__init__(sock=sock, obs_shape=obs_shape, act_shape=act_shape)
 
-        # Define observation and action spaces
+        # Define observation/action spaces
         self.observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
@@ -28,8 +28,8 @@ class GymWrapperSingleEnv(GymWrapperBase):
             dtype=np.float32
         )
         self.action_space = spaces.Box(
-            low=-np.inf,
-            high=np.inf,
+            low=-1.0,
+            high=1.0,
             shape=(self.act_shape,),
             dtype=np.float32
         )
@@ -75,6 +75,7 @@ class GymWrapperSingleEnv(GymWrapperBase):
         """
         try:
             parts = [seg.strip() for seg in data.split(";")]
+            print(parts)
             kv = dict(part.split("=", 1) for part in parts if "=" in part)
 
             obs_str  = kv.get("OBS", "")

@@ -264,16 +264,23 @@ FString UMultiTcpConnection::ReadFromSocket(int32 EnvId, FSocket* EnvSocket, int
 
     // Read any new bytes into PartialData
     uint32 Pending = 0;
-    if (EnvSocket->HasPendingData(Pending) && Pending > 0)
+if (EnvSocket->HasPendingData(Pending) && Pending > 0)
+{
+    int32 ToRead = FMath::Min((int32)Pending, BufSize);
+
+    TArray<uint8> Buffer;
+    Buffer.SetNumUninitialized(ToRead + 1);          // +1 for the null byte
+
+    int32 Read = 0;
+    if (EnvSocket->Recv(Buffer.GetData(), ToRead, Read) && Read > 0)
     {
-        TArray<uint8> Buffer;
-        Buffer.SetNumUninitialized(FMath::Min((int32)Pending, BufSize));
-        int32 Read = 0;
-        if (EnvSocket->Recv(Buffer.GetData(), Buffer.Num(), Read) && Read > 0)
-        {
-            PartialData[EnvId] += FString(UTF8_TO_TCHAR(reinterpret_cast<const char*>(Buffer.GetData())));
-        }
+        Buffer[Read] = 0;                            // ensure null-termination
+
+        // length-aware conversion: copies exactly “Read” bytes
+        FUTF8ToTCHAR Converter(reinterpret_cast<const ANSICHAR*>(Buffer.GetData()), Read);
+        PartialData[EnvId].AppendChars(Converter.Get(), Converter.Length());
     }
+}
 
     // If we have a full line ending in '\n', extract it
     int32 NewlineIdx;
@@ -296,14 +303,14 @@ int32 UMultiTcpConnection::ExtractEnvIdFromData(const FString& Message) const
 
     //  Find the "ENV=" tag
     int32 StartIdx = Message.Find(TEXT("ENV="), ESearchCase::IgnoreCase, ESearchDir::FromStart);
-    if (StartIdx == INDEX_NONE)
-    {
-        return -1;
-    }
-
+    if (StartIdx == INDEX_NONE) return -1;
     StartIdx += 4;
 
-    int32 EndIdx = Message.Find(TEXT("\n"), ESearchCase::IgnoreCase, ESearchDir::FromStart, StartIdx);
+    // Look for the next ';', or if none, use the end of the string:
+    int32 EndIdx = Message.Find(TEXT(";"), ESearchCase::IgnoreCase, ESearchDir::FromStart, StartIdx);
+    if (EndIdx == INDEX_NONE) {
+        EndIdx = Message.Len();
+    }
 
     FString EnvIdStr = Message.Mid(StartIdx, EndIdx - StartIdx).TrimStartAndEnd();
     return FCString::Atoi(*EnvIdStr);
