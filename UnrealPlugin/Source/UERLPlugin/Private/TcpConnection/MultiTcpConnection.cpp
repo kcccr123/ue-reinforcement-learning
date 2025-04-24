@@ -154,6 +154,9 @@ FString UMultiTcpConnection::ReceiveMessageEnv(int32 BufSize)
             }
             FString line = ReadFromSocket(i, EnvSock, BufSize);
             if (!line.IsEmpty()) {
+                // Env no longer added on Python side
+                // EnvID now based on index of socket inside socket array
+                line += FString::Printf(TEXT(";ENV=%d"), i);
                 AllMessages.Add(line);
             }
       

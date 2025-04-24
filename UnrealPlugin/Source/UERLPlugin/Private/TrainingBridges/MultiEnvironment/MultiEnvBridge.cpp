@@ -72,9 +72,6 @@ void UMultiEnvBridge::UpdateRL_Implementation(float DeltaTime)
                     bool bDone = false;
                     float Reward = CalculateRewardForEnv(EnvId, bDone);
                     int32 DoneInt = bDone ? 1 : 0;            
-                    // PROBLEM IS HERE.
-                    // ITS RECEVING DATA FROM PYTHON ENV X
-                    // WHICH IS DEPENDENT ON THE ENV STRING FROM THE PYTHON MODULE
                     FString Response = FString::Printf(TEXT("OBS=%sREW=%.2f;DONE=%d;ENV=%d"),
                         *CreateStateStringForEnv(EnvId), Reward, DoneInt, EnvId);
                     SendData(Response);

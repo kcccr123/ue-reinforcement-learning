@@ -7,11 +7,11 @@ from .gym_wrapper_base import GymWrapperBase
 class GymWrapperMultiEnv(GymWrapperBase):
     """
     A Gym environment wrapper for the MultiEnvBridge protocol:
-      - On reset: sends "ACT=RESET;ENV=<id>" to Unreal
-      - On step:   sends "ACT=<a0>,<a1>,...;ENV=<id>" to Unreal
+      - On reset: sends "ACT=RESET" to Unreal
+      - On step:   sends "ACT=<a0>,<a1>,..." to Unreal
       - Expects responses of the form:
-          "OBS=<obs0>,<obs1>,...;REW=<reward>;DONE=<0|1>;ENV=<id>"
-      - Uses the base class’s send_data / receive_data to handle framing.
+          "OBS=<obs0>,<obs1>,...;REW=<reward>;DONE=<0|1>"
+      - Uses the base class’s send_data / receive_data to handle TCP logic.
     """
 
     def __init__(self, sock, obs_shape=0, act_shape=0, env_id=0):
@@ -41,12 +41,12 @@ class GymWrapperMultiEnv(GymWrapperBase):
     def reset(self, seed=None, options=None):
         """
         Reset this environment instance.
-        Sends "ACT=RESET;ENV=<id>" and parses the returned state.
+        Sends "ACT=RESET" and parses the returned state.
         Returns:
             obs (np.ndarray), info (dict)
         """
         # tell UE to reset this specific env
-        self.send_data(f"ACT=RESET;ENV={self.env_id}")
+        self.send_data(f"ACT=RESET")
         data = self.receive_data()
         obs, reward, done = self._parse_state(data)
         return obs, {}
@@ -54,7 +54,7 @@ class GymWrapperMultiEnv(GymWrapperBase):
     def step(self, action):
         """
         Take one step for this env instance.
-        Sends "ACT=<...>;ENV=<id>" and parses the returned state.
+        Sends "ACT=<...>" and parses the returned state.
         Returns:
             obs (np.ndarray),
             reward (float),
@@ -65,7 +65,7 @@ class GymWrapperMultiEnv(GymWrapperBase):
         # format the action vector
         vals = ",".join(f"{a:.2f}" for a in action) if action is not None else ""
         # include the env index
-        self.send_data(f"ACT={vals};ENV={self.env_id}")
+        self.send_data(f"ACT={vals}")
 
         data = self.receive_data()
         obs, reward, done = self._parse_state(data)
@@ -74,7 +74,7 @@ class GymWrapperMultiEnv(GymWrapperBase):
     def _parse_state(self, data: str):
         """
         Parse a state string from MultiEnvBridge:
-            "OBS=<o0>,...;REW=<r>;DONE=<0|1>;ENV=<id>"
+            "OBS=<o0>,...;REW=<r>;DONE=<0|1>"
         Returns:
             obs   (np.ndarray),
             reward(float),
