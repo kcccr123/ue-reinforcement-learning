@@ -13,9 +13,9 @@ ENV_IP = "127.0.0.1"        # Unreal TCP server IP
 ENV_PORT = 7777             # Unreal TCP server port
 
 TOTAL_TIMESTEPS = 1000000   # Total training timesteps
-LEARNING_RATE = 3e-4        # Learning rate
+LEARNING_RATE = 3e-3        # Learning rate
 GAMMA = 0.99                # Discount factor
-N_STEPS = 2048              # Batch size per update
+N_STEPS = 1024              # Batch size per update
 BATCH_SIZE = 128            # Mini-batch size for PPO updates
 ENT_COEF = 0.01             # Entropy coefficient
 GAE_LAMBDA = 0.95           # GAE lambda
@@ -58,14 +58,14 @@ if __name__ == "__main__":
         vec_env = DummyVecEnv([make_env])
 
     elif env_type == "SINGLE":
-        print("[Training] SINGLE => create new socket for single environment, close admin socket")
+        print("[Training] SINGLE => create new socket for single environment")
         def make_env():
             sock = create_unreal_socket(ENV_IP, ENV_PORT)
             return GymWrapperSingleEnv(sock=sock, obs_shape=obs_shape, act_shape=act_shape)
         vec_env = DummyVecEnv([make_env])
 
     elif env_type == "MULTI":
-        print(f"[Training] MULTI => create {env_count} sub-environments, close admin socket")
+        print(f"[Training] MULTI => create {env_count} sub-environments")
 
         def make_env(i):
             sock = create_unreal_socket(ENV_IP, ENV_PORT)

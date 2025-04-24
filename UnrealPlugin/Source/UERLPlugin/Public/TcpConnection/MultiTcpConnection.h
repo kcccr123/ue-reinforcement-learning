@@ -10,6 +10,7 @@
  * Designed specifically to work with MultiEnvBridge.
  * 
  * An array EnvSockets of size NumEnvironments stores each socket. 
+ * EnvID is based on index of socket inside socket array.
  * Num enviornments must be initalized before connecting in the bridge.
  * 
  * SendMessageEnv() parses "ENV=%d" from the string to find which socket to use.
