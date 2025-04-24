@@ -221,8 +221,8 @@ bool URLBaseBridge::SendData(const FString& Data)
         return false;
     }
 
-    // Append the "STEP" delimiter to the message.
-    FString DataWithDelimiter = Data + TEXT("STEP");
+    // Append the newline delimiter to the message.
+    FString DataWithDelimiter = Data + TEXT("\n");
 
     // Convert FString to UTF-8
     FTCHARToUTF8 Converter(*DataWithDelimiter);
@@ -248,22 +248,28 @@ FString URLBaseBridge::ReceiveData()
         return TEXT("");
     }
 
-    // Buffer for receiving data
-    uint8 DataBuffer[1024];
-    FMemory::Memset(DataBuffer, 0, 1024);
-    int32 BytesRead = 0;
-
-    bool bReceived = ConnectionSocket->Recv(DataBuffer, 1024, BytesRead);
-    if (!bReceived || BytesRead <= 0)
-    {
-        // If no data is received, return empty string
-        return TEXT("");
+    uint32 Pending = 0;
+    if (ConnectionSocket->HasPendingData(Pending), Pending > 0) {
+        TArray<uint8> Buffer;
+        Buffer.SetNumUninitialized(FMath::Min((int32)Pending, 1024));
+        int32 Read = 0;
+        if (ConnectionSocket->Recv(Buffer.GetData(), Buffer.Num(), Read) && Read > 0)
+        {
+            PartialData += FString(UTF8_TO_TCHAR(reinterpret_cast<const char*>(Buffer.GetData())));
+        }
     }
 
-    // Convert received bytes back to FString (assuming UTF-8)
-    FString ReceivedString = FString(UTF8_TO_TCHAR(reinterpret_cast<const char*>(DataBuffer)));
-    UE_LOG(LogTemp, Log, TEXT("RLBaseBridge: Received data -> %s"), *ReceivedString);
-    return ReceivedString;
+    // If we have a full line ending in '\n', extract it
+    int32 NewlineIdx;
+    if (PartialData.FindChar('\n', NewlineIdx))
+    {
+        FString Line = PartialData.Left(NewlineIdx);
+        PartialData = PartialData.Mid(NewlineIdx + 1);
+        UE_LOG(LogTemp, Log, TEXT("[RLBaseBridge] Received: %s"), *Line);
+        return Line;
+    }
+
+    return TEXT("");
 }
 
 

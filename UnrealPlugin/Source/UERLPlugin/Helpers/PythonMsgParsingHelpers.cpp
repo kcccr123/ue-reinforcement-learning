@@ -2,32 +2,40 @@
 
 int32 UPythonMsgParsingHelpers::ParseEnvId(const FString& Message)
 {
-    // Expected format: "ENV=2;ACT=0.10,-0.20" or "ENV=1;RESET"
-    int32 EnvId = 0;
-    int32 StartIdx = Message.Find(TEXT("ENV="));
-    if (StartIdx != INDEX_NONE)
+    TArray<FString> Parts;
+    Message.ParseIntoArray(Parts, TEXT(";"), true);
+
+    // Find the token that starts with "ENV="
+    for (const FString& Part : Parts)
     {
-        StartIdx += 4; // Skip "ENV="
-        int32 EndIdx;
-        if (Message.FindChar(';', EndIdx))
+        if (Part.StartsWith(TEXT("ENV="), ESearchCase::IgnoreCase))
         {
-            FString EnvIdStr = Message.Mid(StartIdx, EndIdx - StartIdx);
-            EnvId = FCString::Atoi(*EnvIdStr);
+            FString IdStr = Part.Mid(4);
+            return FCString::Atoi(*IdStr);
         }
     }
-    return EnvId;
+    UE_LOG(LogTemp, Error, TEXT("PY->UE: «%s»"), *Message);
+    return -1;
 }
+
 
 FString UPythonMsgParsingHelpers::ParseActionString(const FString& Message)
 {
-    // Expected format: "ENV=x;ACT=0.10,-0.20"
-    int32 ActIdx = Message.Find(TEXT("ACT="));
-    if (ActIdx != INDEX_NONE)
+    TArray<FString> Parts;
+    Message.ParseIntoArray(Parts, TEXT(";"), true);
+
+    // Find the token that begins with "ACT="
+    for (const FString& Part : Parts)
     {
-        return Message.Mid(ActIdx + 4).TrimStartAndEnd();
+        if (Part.StartsWith(TEXT("ACT="), ESearchCase::IgnoreCase))
+        {
+            return Part.Mid(4).TrimStartAndEnd();
+        }
     }
+
     return FString();
 }
+
 
 TArray<float> UPythonMsgParsingHelpers::ParseActionFloatArray(const FString& ActionString)
 {

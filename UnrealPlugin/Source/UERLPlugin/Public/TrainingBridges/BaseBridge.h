@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
-#include "Tickable.h" // For FTickableGameObject
+#include "Tickable.h"
 #include "Inference/InferenceInterfaces/InferenceInterface.h"
 #include "TcpConnection/BaseTcpConnection.h"
 #include "BaseBridge.generated.h"
@@ -119,7 +119,7 @@ protected:
     // -------------------------------------------------------------
 
     /**
-     * Send data across the connection, by default appending "STEP" delimiter.
+     * Send data across the connection.
      * Subclasses can override if desired.
      */
     UFUNCTION(BlueprintCallable, Category = "Bridge|Communication")

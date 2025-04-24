@@ -48,7 +48,7 @@ bool UBaseTcpConnection::SendMessageAdmin(const FString& Data)
         return false;
     }
 
-    FTCHARToUTF8 Converter(*Data);
+    FTCHARToUTF8 Converter(*(Data + TEXT("\n")));
     const int32 BytesToSend = Converter.Length();
     int32 BytesSent = 0;
 

@@ -6,14 +6,24 @@
 
 /**
  * Multi-environment TCP connection:
+ *
+ * Designed specifically to work with MultiEnvBridge.
+ * 
  * An array EnvSockets of size NumEnvironments stores each socket. 
- * Num enviornments mult be initalized before connecting in the bridge.
- * In AcceptEnvConnection, we find the first empty slot; if none, reject and close new socket.
- * If we fill all slots, we stop the acceptance thread.
+ * EnvID is based on index of socket inside socket array.
+ * Num enviornments must be initalized before connecting in the bridge.
+ * 
  * SendMessageEnv() parses "ENV=%d" from the string to find which socket to use.
  * ReceiveMessageEnv() returns a single combined string of new messages from all envs.
  * 
+ * Uses "\n" as delimiter.
  */
+
+
+// % TODO: In the future, why not just use a bunch of the SingleTcpConnection classes inside MultiEnvBridge?
+// This class is too coupled with MultiEnvBridge, not very versatile.
+// Breaks our abstarct design if we go through with that though.
+
 UCLASS()
 class UERLPLUGIN_API UMultiTcpConnection : public UBaseTcpConnection
 {
@@ -40,12 +50,14 @@ public:
 
     /**
      * Instead of needing an EnvId param, we parse "ENV=%d" from the Data string
-     * and send the message to that environment index.
+     * and send the message to that environment index. Applies newline char as delimiter.
      */
     virtual bool SendMessageEnv(const FString& Data) override;
 
     /**
-     * Gather new messages from all environment sockets. We parse partial data with "||",
+     * Gather new messages from all environment sockets. 
+     * Parses partial messages into buffer.
+     * Expects newline char as delimiter.
      */
     virtual FString ReceiveMessageEnv(int32 BufSize = 1024) override;
 
@@ -91,7 +103,7 @@ protected:
 
     /**
      * Partial data storage for each environment. If we receive a partial message that
-     * doesn't end with "||", we store the leftover here and combine it on the next read.
+     * doesn't end with a newline char, we store the leftover here and combine it on the next read.
      */
     TArray<FString> PartialData;
 
@@ -101,20 +113,15 @@ protected:
 
     /**
      * Reads up to BufSize from EnvSocket, merges with leftover partial data,
-     * splits by "||", returns completed messages for that environment.
+     * splits by "\n", returns completed messages for that environment.
      */
-    TArray<FString> ReadFromSocket(int32 EnvId, FSocket* EnvSocket, int32 BufSize);
+    FString ReadFromSocket(int32 EnvId, FSocket* EnvSocket, int32 BufSize);
 
-    /**
-     * Splits InBuffer on "||". Completed messages go to OutMessages,
-     * leftover partial is OutPartial if the buffer doesn't end with "||".
-     */
-    void ParseBufferIntoMessages(const FString& InBuffer, TArray<FString>& OutMessages, FString& OutPartial);
 
     /**
      * Extract "ENV=%d" from the provided Data string. If not found or invalid, returns -1.
      */
-    int32 ExtractEnvIdFromData(const FString& Data) const;
+    int32 ExtractEnvIdFromData(const FString& Message) const;
 
     /**
      * Checks if all EnvSockets[i] are assigned (none are null).

@@ -10,6 +10,7 @@
  * Base class for RL communication using TCP.
  * This class provides a framework for setting up your RL environment in Unreal Engine.
  * It includes default implementations for connecting and disconnecting via TCP.
+ * Intended for use with single environment.
  */
 UCLASS(Abstract, Blueprintable)
 class UERLPLUGIN_API URLBaseBridge : public UObject, public FTickableGameObject
@@ -63,6 +64,9 @@ protected:
     // Socket info (set on connection).
     FString CurrentIP;
     int32 CurrentPort;
+
+    // Buffer leftover data until we see a full line (newline-delimited)
+    FString PartialData;
 
     // Pointer to model interface
     UInferenceInterface * InferenceInterface = nullptr;
