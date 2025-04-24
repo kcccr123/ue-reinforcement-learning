@@ -33,7 +33,6 @@ bool USingleTcpConnection::StartListening(const FString& IPAddress, int32 Port)
     return true;
 }
 
-
 void USingleTcpConnection::StartAcceptThread()
 {
     bStopAcceptThreadRef = false;
@@ -68,7 +67,6 @@ bool USingleTcpConnection::AcceptEnvConnection(FSocket* InNewSocket)
     EnvSocket = InNewSocket;
     UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Environment socket connected. Single env is ready."));
 
-    // We can kill the accept thread if we don't expect more env connections
     if (AcceptRunnableRef.IsValid())
     {
         AcceptRunnableRef->Stop();
@@ -84,10 +82,10 @@ bool USingleTcpConnection::SendMessageEnv(const FString& Data)
         return false;
     }
 
-    // Append "STEP" delimiter
-    FString DataWithStep = Data + TEXT("STEP");
+    // Append newline delimiter
+    FString Payload = Data + TEXT("\n");
 
-    FTCHARToUTF8 Converter(*DataWithStep);
+    FTCHARToUTF8 Converter(*Payload);
     int32 BytesSent = 0;
     bool bSuccess = EnvSocket->Send(
         reinterpret_cast<const uint8*>(Converter.Get()),
@@ -101,37 +99,42 @@ bool USingleTcpConnection::SendMessageEnv(const FString& Data)
         return false;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Sent to env => %s"), *DataWithStep);
+    UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Sent to env => %s"), *Payload);
     return true;
 }
-
 
 FString USingleTcpConnection::ReceiveMessageEnv(int32 BufSize)
 {
     if (!EnvSocket)
     {
+        UE_LOG(LogTemp, Error, TEXT("Bridge: No connection socket available for receiving."));
         return TEXT("");
     }
 
-    uint32 PendingSize = 0;
-    if (!EnvSocket->HasPendingData(PendingSize) || PendingSize == 0)
+    // Read any new bytes into PartialData
+    uint32 Pending = 0;
+    if (EnvSocket->HasPendingData(Pending) && Pending > 0)
     {
-        return TEXT("");
+        TArray<uint8> Buffer;
+        Buffer.SetNumUninitialized(FMath::Min((int32)Pending, BufSize));
+        int32 Read = 0;
+        if (EnvSocket->Recv(Buffer.GetData(), Buffer.Num(), Read) && Read > 0)
+        {
+            PartialData += FString(UTF8_TO_TCHAR(reinterpret_cast<const char*>(Buffer.GetData())));
+        }
     }
 
-    TArray<uint8> DataBuffer;
-    DataBuffer.SetNumUninitialized(FMath::Min((int32)PendingSize, BufSize));
-
-    int32 BytesRead = 0;
-    bool bOk = EnvSocket->Recv(DataBuffer.GetData(), DataBuffer.Num(), BytesRead);
-    if (!bOk || BytesRead <= 0)
+    // If we have a full line ending in '\n', extract it
+    int32 NewlineIdx;
+    if (PartialData.FindChar('\n', NewlineIdx))
     {
-        return TEXT("");
+        FString Line = PartialData.Left(NewlineIdx);
+        PartialData = PartialData.Mid(NewlineIdx + 1);
+        UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Received: %s"), *Line);
+        return Line;
     }
 
-    FString Received = FString(UTF8_TO_TCHAR(reinterpret_cast<const char*>(DataBuffer.GetData())));
-    UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Received from env => %s"), *Received);
-    return Received;
+    return TEXT("");
 }
 
 void USingleTcpConnection::CloseConnection()
@@ -171,10 +174,9 @@ void USingleTcpConnection::CloseConnection()
     if (EnvSocket)
     {
         EnvSocket->Close();
-        SocketSubsystem->DestroySocket(EnvSocket);
+        ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(EnvSocket);
         EnvSocket = nullptr;
     }
 
     UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Closed sockets (admin + env)."));
 }
-

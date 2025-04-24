@@ -16,7 +16,7 @@ class UERLPLUGIN_API UBaseTcpConnection : public UObject
     GENERATED_BODY()
 
 public:
-    virtual ~UBaseTcpConnection() override { CloseConnection(); }
+    virtual ~UBaseTcpConnection() override = default;
 
     //--------------------------------------------------------------------------
     // Interface methods
@@ -68,12 +68,14 @@ public:
 
     /**
      * Receives a UTF-8 string from the admin socket, returns empty if none is pending.
+     * Applies newline char as delimiter.
      */
     virtual FString ReceiveMessageAdmin(int32 BufSize = 1024);
 
     /**
      * Receives a UTF-8 string from environment socket(s).
      * Subclass must define logic (single, multi, round-robin, etc.).
+     * Expects newline char as delimiter.
      */
     virtual FString ReceiveMessageEnv(int32 BufSize = 1024) PURE_VIRTUAL(UBaseTcpConnection::ReceiveMessageEnv, return TEXT(""););
 

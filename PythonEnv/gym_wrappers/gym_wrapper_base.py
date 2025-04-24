@@ -9,6 +9,7 @@ class GymWrapperBase(gym.Env, metaclass=abc.ABCMeta):
       - A pre-connected socket (sock)
       - Known obs_shape and act_shape
     No handshake or network connection logic is contained here.
+    TCP uses and expects "\n" (newline char) as delimiter.
     """
 
     def __init__(self, sock, obs_shape=0, act_shape=0):
@@ -43,6 +44,7 @@ class GymWrapperBase(gym.Env, metaclass=abc.ABCMeta):
 
     def send_data(self, data: str):
         """Send a UTF-8 encoded string over the TCP connection."""
+        data += "\n"
         if self.sock:
             try:
                 self.sock.sendall(data.encode('utf-8'))
@@ -52,21 +54,21 @@ class GymWrapperBase(gym.Env, metaclass=abc.ABCMeta):
 
     def receive_data(self, bufsize=1024) -> str:
         """
-        Receive data from the Unreal environment until the "STEP" delimiter is encountered.
+        Receive data from the Unreal environment until the newline delimiter is encountered.
         Returns the complete message (delimiter removed).
         """
         if not self.sock:
             return ""
 
         try:
-            while "STEP" not in self.recv_buffer:
+            while "\n" not in self.recv_buffer:
                 data = self.sock.recv(bufsize)
                 if not data:
                     break
                 self.recv_buffer += data.decode('utf-8')
 
-            if "STEP" in self.recv_buffer:
-                message, self.recv_buffer = self.recv_buffer.split("STEP", 1)
+            if "\n" in self.recv_buffer:
+                message, self.recv_buffer = self.recv_buffer.split("\n", 1)
                 message = message.strip()
                 print(f"[GymWrapperBase] Received data: {message}")
                 return message
