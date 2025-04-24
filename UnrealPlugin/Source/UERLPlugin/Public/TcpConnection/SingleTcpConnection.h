@@ -1,3 +1,4 @@
+// SingleTcpConnection.h
 #pragma once
 
 #include "CoreMinimal.h"
@@ -9,6 +10,8 @@ class FSocket;
 
 /**
  * Basic Single-environment TCP connection:
+ * 
+ * Uses "\n" as delimiter.
  */
 UCLASS()
 class UERLPLUGIN_API USingleTcpConnection : public UBaseTcpConnection
@@ -24,9 +27,10 @@ public:
     // Accept environment connection
     virtual bool AcceptEnvConnection(FSocket* InNewSocket) override;
 
-    // Send data to environment
+    // Send data to environment. Applies newline char as delimiter.
     virtual bool SendMessageEnv(const FString& Data) override;
-    // Receive data from environment
+
+    // Receive data from environment. Expects newline char as delimiter.
     virtual FString ReceiveMessageEnv(int32 BufSize = 1024) override;
 
     // Clean up
@@ -44,4 +48,7 @@ public:
 protected:
     // The environment socket
     FSocket* EnvSocket = nullptr;
+
+    // Buffer leftover data until we see a full line (newline-delimited)
+    FString PartialData;
 };

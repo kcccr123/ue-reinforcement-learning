@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 
 #include "TrainingBridges/BaseBridge.h"
 #include "UERLPlugin/Helpers/BPFL_DataHelpers.h"
@@ -89,7 +87,7 @@ bool UBaseBridge::SendData(const FString& Data)
         UE_LOG(LogTemp, Error, TEXT("[UBaseBridge] SendData: No valid TCP connection."));
         return false;
     }
-    return TcpConnection->SendMessageEnv(Data + TEXT("STEP"));
+    return TcpConnection->SendMessageEnv(Data);
 }
 
 FString UBaseBridge::ReceiveData()
