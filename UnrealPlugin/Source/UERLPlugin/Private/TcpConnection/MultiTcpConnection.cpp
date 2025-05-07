@@ -115,7 +115,7 @@ bool UMultiTcpConnection::SendMessageEnv(const FString& Data)
 
     FSocket* EnvSock = EnvSockets[EnvId];
 
-    // Append "STEP" delimiter
+    // Append "\n" delimiter
     FString DataWithStep = Data + TEXT("\n");
 
     FTCHARToUTF8 Converter(*DataWithStep);
