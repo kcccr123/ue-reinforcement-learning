@@ -1,5 +1,8 @@
+import argparse as ap
+
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines3.common.callbacks import CheckpointCallback
 
 from sockets.admin_manager import AdminManager
 from sockets.socket_factory import create_unreal_socket
@@ -12,7 +15,7 @@ from gym_wrappers.gym_wrapper_multi_env import GymWrapperMultiEnv
 ENV_IP = "127.0.0.1"        # Unreal TCP server IP
 ENV_PORT = 7777             # Unreal TCP server port
 
-TOTAL_TIMESTEPS = 1000000   # Total training timesteps
+TOTAL_TIMESTEPS = 128   # Total training timesteps
 LEARNING_RATE = 3e-3        # Learning rate
 GAMMA = 0.99                # Discount factor
 N_STEPS = 1024              # Batch size per update
@@ -25,8 +28,22 @@ MAX_GRAD_NORM = 0.5         # Gradient clipping
 
 MODEL_NAME = "model"        # Model filename prefix
 
+
 # -------------------- TRAINING SCRIPT -------------------- #
 if __name__ == "__main__":
+
+# ____Training Options ____ #
+    parser = ap.ArgumentParser()
+    parser.add_argument("--load_cp", type=str, help="Path to checkpoint zip file if it is required to continue training from last checkpoint.")
+
+    args = parser.parse_args()
+
+    load_checkpoint = False
+    checkpoint_path = ""
+
+    if args.load_cp is not None:
+        load_checkpoint = True
+        checkpoint_path = args.load_cp
 
     # Initialize and connect the AdminManager
     admin = AdminManager(ip=ENV_IP, port=ENV_PORT)
@@ -78,23 +95,35 @@ if __name__ == "__main__":
         raise ValueError("Handshake error: Unknown enviornment type")
     
     # Create the model (by default ppo, add your own if you want)
-    model = PPO(
-        "MlpPolicy",
-        vec_env,
-        verbose=1,
-        learning_rate=LEARNING_RATE,
-        gamma=GAMMA,
-        n_steps=N_STEPS,
-        batch_size=BATCH_SIZE,
-        ent_coef=ENT_COEF,
-        gae_lambda=GAE_LAMBDA,
-        clip_range=CLIP_RANGE,
-        vf_coef=VF_COEF,
-        max_grad_norm=MAX_GRAD_NORM
+    if load_checkpoint:
+        print("\n =====================Continue training from previous checkpoint======================\n")
+        model = PPO.load(checkpoint_path, env=vec_env, force_reset=False)
+    else:
+        model = PPO(
+            "MlpPolicy",
+            vec_env,
+            verbose=1,
+            learning_rate=LEARNING_RATE,
+            gamma=GAMMA,
+            n_steps=N_STEPS,
+            batch_size=BATCH_SIZE,
+            ent_coef=ENT_COEF,
+            gae_lambda=GAE_LAMBDA,
+            clip_range=CLIP_RANGE,
+            vf_coef=VF_COEF,
+            max_grad_norm=MAX_GRAD_NORM
+        )
+
+    # Periodic Imaging
+    imaging = CheckpointCallback(
+    save_freq=100_000,
+    save_path="checkpoints",
+    name_prefix="ppo_unreal",
     )
 
     # Train the model
-    model.learn(total_timesteps=TOTAL_TIMESTEPS)
+    model.learn(total_timesteps=TOTAL_TIMESTEPS, reset_num_timesteps= not load_checkpoint, callback=imaging)
+        
     model.save(MODEL_NAME)
     print(f"[Training] Model saved as '{MODEL_NAME}'")
 
