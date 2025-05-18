@@ -1,5 +1,9 @@
-from stable_baselines3 import PPO
+import argparse as ap
+import yaml, sys, pathlib
+
+from stable_baselines3 import PPO, A2C, SAC, TD3, DQN, DDPG
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines3.common.callbacks import CheckpointCallback
 
 from sockets.admin_manager import AdminManager
 from sockets.socket_factory import create_unreal_socket
@@ -8,25 +12,86 @@ from gym_wrappers.gym_wrapper_rl_base import GymWrapperRLBase
 from gym_wrappers.gym_wrapper_single_env import GymWrapperSingleEnv
 from gym_wrappers.gym_wrapper_multi_env import GymWrapperMultiEnv
 
-# -------------------- CONSTANTS -------------------- #
+# -------------------- ENV CONSTANTS -------------------- #
 ENV_IP = "127.0.0.1"        # Unreal TCP server IP
 ENV_PORT = 7777             # Unreal TCP server port
-
-TOTAL_TIMESTEPS = 1000000   # Total training timesteps
-LEARNING_RATE = 3e-3        # Learning rate
-GAMMA = 0.99                # Discount factor
-N_STEPS = 1024              # Batch size per update
-BATCH_SIZE = 128            # Mini-batch size for PPO updates
-ENT_COEF = 0.01             # Entropy coefficient
-GAE_LAMBDA = 0.95           # GAE lambda
-CLIP_RANGE = 0.2            # PPO clipping parameter
-VF_COEF = 0.5               # Value function loss coefficient
-MAX_GRAD_NORM = 0.5         # Gradient clipping
-
-MODEL_NAME = "model"        # Model filename prefix
-
 # -------------------- TRAINING SCRIPT -------------------- #
+
+def load_config(cfg_file):
+    try:
+        with cfg_file.open("r") as f:
+            cfg = yaml.safe_load(f) 
+    except yaml.YAMLError as e:
+        print(f"YAML parse error.\n")
+        sys.exit(1)
+
+    algo = cfg["model"]
+
+    common = cfg["common_parameters"]
+    hps = dict(
+        device         = common["device"],
+        learning_rate  = common["learning_rate"],
+        gamma          = common["gamma"],
+        verbose        = common["verbose"],
+    )
+
+    if algo != "a2c":
+        hps.update(batch_size     = common["batch_size"],)
+
+    if algo in ("ppo", "a2c"):
+        policy = cfg["on_policy"]
+        hps.update(
+            n_steps    = policy["n_steps"],
+            gae_lambda = policy["gae_lambda"],
+            ent_coef   = policy["ent_coef"],
+        )
+        hps.update(policy.get(algo, {})) 
+    else:
+        policy = cfg["off_policy"]
+        hps.update(
+            buffer_size     = policy["buffer_size"],
+            tau             = policy["tau"],
+            learning_starts = policy["learning_starts"],
+        )
+        hps.update(policy.get(algo, {})) 
+    paths = cfg["paths"]
+    resume = cfg.get("load_from_checkpoint", False)
+    total_timesteps = cfg["total_timesteps"]
+
+    pathlib.Path(paths["save_dir"]).mkdir(parents=True, exist_ok=True)
+
+
+    return algo, hps, paths, resume, total_timesteps
+
 if __name__ == "__main__":
+
+# ____Training Options ____ #
+    parser = ap.ArgumentParser()
+    parser.add_argument("--config", type=str, help="Path to config file")
+
+    args = parser.parse_args()
+    if args.config is None:
+        print("Path to config file not found.\n")
+        sys.exit(1)
+
+    cfg_file = pathlib.Path(args.config)
+    if not cfg_file.is_file():
+        print(f"Config file not found: {cfg_file}")
+        sys.exit(1)
+
+
+    ALGOS = {
+    "ppo":  PPO,  "a2c": A2C,
+    "sac":  SAC,  "td3": TD3,  "ddpg": DDPG,
+    }
+
+    algo, hparams, paths, load_checkpoint, total_timesteps = load_config(cfg_file)
+    try:
+        model_class = ALGOS[algo]
+        print(algo+"\n\n\n\n")
+    except KeyError:
+        raise ValueError(f"Algo '{algo}' not in {list(ALGOS)}")
+
 
     # Initialize and connect the AdminManager
     admin = AdminManager(ip=ENV_IP, port=ENV_PORT)
@@ -78,25 +143,24 @@ if __name__ == "__main__":
         raise ValueError("Handshake error: Unknown enviornment type")
     
     # Create the model (by default ppo, add your own if you want)
-    model = PPO(
-        "MlpPolicy",
-        vec_env,
-        verbose=1,
-        learning_rate=LEARNING_RATE,
-        gamma=GAMMA,
-        n_steps=N_STEPS,
-        batch_size=BATCH_SIZE,
-        ent_coef=ENT_COEF,
-        gae_lambda=GAE_LAMBDA,
-        clip_range=CLIP_RANGE,
-        vf_coef=VF_COEF,
-        max_grad_norm=MAX_GRAD_NORM
+    if load_checkpoint:
+        print("\n =====================Continue training from previous checkpoint======================\n")
+        model = model_class.load(paths["previous_model"], env=vec_env, force_reset=False, device=hparams["device"])
+    else:
+        model = model_class("MlpPolicy", vec_env, **hparams)
+
+    # Periodic Imaging
+    imaging = CheckpointCallback(
+    save_freq=100_000,
+    save_path=paths["save_dir"],
+    name_prefix="checkpoint"
     )
 
     # Train the model
-    model.learn(total_timesteps=TOTAL_TIMESTEPS)
-    model.save(MODEL_NAME)
-    print(f"[Training] Model saved as '{MODEL_NAME}'")
+    model.learn(total_timesteps=total_timesteps, reset_num_timesteps= not load_checkpoint, callback=imaging)
+        
+    model.save(path=paths["save_dir"])
+    print(f"[Training] Model saved to '{paths['save_dir']}'")
 
     # TODO: Notify Unreal that training is complete through admin connection:
     # NEED TO ADD SEND COMMAND FOR ADMIN SOCKET, CURRENTLY USER JUST MANUALLY CLOSES UNREAL
