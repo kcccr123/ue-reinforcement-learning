@@ -2,6 +2,11 @@ model: a2c
 model_name: temp_model         # model filename prefix
 load_from_checkpoint: true
 total_timesteps: 128         # total training timesteps
+checkpoint_freq: 100_000
+
+env:
+ip = 127.0.0.1        # Unreal TCP server IP
+port = 7777           # Unreal TCP server port
 
 paths:
   save_dir: "D:\\Projects\\RL_game\\ue-reinforcement-learning\\PythonEnv\\example_model\\temp_model"
