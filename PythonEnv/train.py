@@ -1,12 +1,70 @@
 import argparse as ap
-import sys, pathlib, queue, signal
+import sys, pathlib, queue, yaml
 from bridge import AdminTHD, envTHD
-import utils as help
 
 from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3 import PPO, A2C, SAC, TD3, DDPG
 
 ENV_IP  = "127.0.0.1"        # Unreal TCP server IP
 ENV_PORT = 7777         # Unreal TCP server port
+
+def load_config(cfg_file):
+    try:
+        with cfg_file.open("r") as f:
+            cfg = yaml.safe_load(f) 
+    except yaml.YAMLError as e:
+        print(f"YAML parse error.\n")
+        sys.exit(1)
+
+    ALGOS = {
+    "ppo":  PPO,  "a2c": A2C,
+    "sac":  SAC,  "td3": TD3,  "ddpg": DDPG,
+    }
+
+    algo_name = cfg["model"]
+    try:
+        algo = ALGOS[algo_name]
+    except KeyError as e:
+        raise ValueError(f"Unsupported algo '{algo_name}'. Allowed: {list(ALGOS)}") from e
+    
+
+
+    common = cfg["common_parameters"]
+    hps = dict(
+        device         = common["device"],
+        learning_rate  = common["learning_rate"],
+        gamma          = common["gamma"],
+        verbose        = common["verbose"],
+    )
+
+    if algo != "a2c":
+        hps.update(batch_size     = common["batch_size"],)
+
+    if algo in ("ppo", "a2c"):
+        policy = cfg["on_policy"]
+        hps.update(
+            n_steps    = policy["n_steps"],
+            gae_lambda = policy["gae_lambda"],
+            ent_coef   = policy["ent_coef"],
+        )
+        hps.update(policy.get(algo, {})) 
+    else:
+        policy = cfg["off_policy"]
+        hps.update(
+            buffer_size     = policy["buffer_size"],
+            tau             = policy["tau"],
+            learning_starts = policy["learning_starts"],
+        )
+        hps.update(policy.get(algo, {})) 
+    paths = cfg["paths"]
+    resume = cfg.get("load_from_checkpoint", False)
+    total_timesteps = cfg["total_timesteps"]
+    checkpt_freq =cfg["checkpoint_freq"]
+
+    pathlib.Path(paths["save_dir"]).mkdir(parents=True, exist_ok=True)
+
+
+    return algo, hps, paths, resume, total_timesteps, checkpt_freq
 
 # -------------------- TRAINING SCRIPT -------------------- #
 def main():
@@ -23,9 +81,8 @@ def main():
         print(f"Config file not found: {cfg_file}")
         sys.exit(1)
 
-    algo, hps, paths, resume, total_timesteps, checkpt_freq = help.load_config(cfg_file)
+    algo, hps, paths, resume, total_timesteps, checkpt_freq = load_config(cfg_file)
 
-    model_cls = help.get_model_class(algo)
     print("HERE")
     meta_q = queue.Queue(maxsize=1)
     print("a")
@@ -44,9 +101,9 @@ def main():
 
     if resume:
         print("\n =====================Continue training from previous checkpoint======================\n")
-        model = model_cls.load(paths["previous_model"], env=vec_env, force_reset=False, device=hps["device"])
+        model = algo.load(paths["previous_model"], env=vec_env, force_reset=False, device=hps["device"])
     else:
-        model = model_cls("MlpPolicy", vec_env, **hps)
+        model = algo("MlpPolicy", vec_env, **hps)
 
     # Periodic Imaging
     imaging = CheckpointCallback(
