@@ -1,9 +1,7 @@
-import sys, pathlib, yaml, queue, threading, signal, time
+import threading, time
 
 from sockets.admin_manager import AdminManager
 from sockets.socket_factory import create_unreal_socket
-
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 from gym_wrappers.gym_wrapper_rl_base import GymWrapperRLBase
 from gym_wrappers.gym_wrapper_single_env import GymWrapperSingleEnv
@@ -85,11 +83,13 @@ class envTHD:
         return _init
 
     def build(self):
+        is_multi = False
         if self.env_type == "MULTI":
+            is_multi = True
             env_fns = [self.init_multi_env(i) for i in range(self.n_envs)]
-            return SubprocVecEnv(env_fns, start_method="spawn")
         else:
             env_fns = [self.init_single_env()]
-            return DummyVecEnv(env_fns)
+        
+        return env_fns, is_multi
 
         
