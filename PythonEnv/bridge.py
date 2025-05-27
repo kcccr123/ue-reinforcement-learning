@@ -58,7 +58,7 @@ class envTHD:
                     obs_shape=obs_shape,
                     act_shape=act_shape,
                 )
-            else:  # SINGLE
+            elif env_type == "SINGLE":  # SINGLE
                 print("[Training] SINGLE => new socket")
                 sock = create_unreal_socket(ip, port)
                 return GymWrapperSingleEnv(
