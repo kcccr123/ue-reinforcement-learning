@@ -1,7 +1,8 @@
-model: a2c
-model_name: temp_model         # model filename prefix
-load_from_checkpoint: true
-total_timesteps: 128         # total training timesteps
+model: ppo
+model_name: temp_model # model filename prefix
+load_from_checkpoint: false
+total_timesteps: 128 # total training timesteps
+checkpoint_freq: 100_000
 
 paths:
   save_dir: "D:\\Projects\\RL_game\\ue-reinforcement-learning\\PythonEnv\\example_model\\temp_model"
@@ -9,15 +10,15 @@ paths:
 
 common_parameters:
   device: cpu
-  learning_rate: 0.003         # learning rate
-  gamma: 0.99                  # discount factor
-  verbose: 1                   # 0-no msg / 1-info / 2-debug
-  batch_size: 128              # mini-batch size for ppo updates
+  learning_rate: 0.003 # learning rate
+  gamma: 0.99 # discount factor
+  verbose: 1 # 0-no msg / 1-info / 2-debug
+  batch_size: 128 # mini-batch size for ppo updates
 
 on_policy:
-  n_steps: 1024
+  n_steps: 2048
   gae_lambda: 0.95
-  ent_coef: 0.01
+  ent_coef: 0.00
 
   ppo:
     n_epochs: 10
@@ -27,7 +28,7 @@ on_policy:
 off_policy:
   buffer_size: 1_000_000
   tau: 0.005
-  learning_starts: 1000
+  learning_starts: 100
 
   sac:
     ent_coef: auto
