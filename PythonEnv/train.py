@@ -1,106 +1,131 @@
-from stable_baselines3 import PPO
+import argparse as ap
+import sys, pathlib, queue, yaml
+from bridge import AdminTHD, envTHD
+
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines3 import PPO, A2C, SAC, TD3, DDPG
+from stable_baselines3.common.callbacks import CheckpointCallback
 
-from sockets.admin_manager import AdminManager
-from sockets.socket_factory import create_unreal_socket
+ENV_IP  = "127.0.0.1"        # Unreal TCP server IP
+ENV_PORT = 7777         # Unreal TCP server port
 
-from gym_wrappers.gym_wrapper_rl_base import GymWrapperRLBase
-from gym_wrappers.gym_wrapper_single_env import GymWrapperSingleEnv
-from gym_wrappers.gym_wrapper_multi_env import GymWrapperMultiEnv
+def load_config(cfg_file):
+    try:
+        with cfg_file.open("r") as f:
+            cfg = yaml.safe_load(f) 
+    except yaml.YAMLError as e:
+        print(f"YAML parse error.\n")
+        sys.exit(1)
 
-# -------------------- CONSTANTS -------------------- #
-ENV_IP = "127.0.0.1"        # Unreal TCP server IP
-ENV_PORT = 7777             # Unreal TCP server port
+    ALGOS = {
+    "ppo":  PPO,  "a2c": A2C,
+    "sac":  SAC,  "td3": TD3,  "ddpg": DDPG,
+    }
 
-TOTAL_TIMESTEPS = 1000000   # Total training timesteps
-LEARNING_RATE = 3e-3        # Learning rate
-GAMMA = 0.99                # Discount factor
-N_STEPS = 1024              # Batch size per update
-BATCH_SIZE = 128            # Mini-batch size for PPO updates
-ENT_COEF = 0.01             # Entropy coefficient
-GAE_LAMBDA = 0.95           # GAE lambda
-CLIP_RANGE = 0.2            # PPO clipping parameter
-VF_COEF = 0.5               # Value function loss coefficient
-MAX_GRAD_NORM = 0.5         # Gradient clipping
+    algo= cfg["model"]
 
-MODEL_NAME = "model"        # Model filename prefix
-
-# -------------------- TRAINING SCRIPT -------------------- #
-if __name__ == "__main__":
-
-    # Initialize and connect the AdminManager
-    admin = AdminManager(ip=ENV_IP, port=ENV_PORT)
-    admin.connect()
-
-    # Block until we receive a valid handshake (ENV_TYPE, OBS, ACT, ENV_COUNT).
-    # Meanwhile, any other commands that come in will be processed in dispatch.
-    env_type, obs_shape, act_shape, env_count = admin.wait_for_handshake()
-
-    # Check for handshake errors
-    if env_type is None:
-        print("[Training] Could not complete handshake")
-        admin.close()
-        exit(1) 
-
-    # if observation space or action space is size 0 raise error
-    if obs_shape == 0 or act_shape == 0:
-        admin.close()
-        raise ValueError("Handshake error: obs_shape and act_shape must be non-zero"
-                         f"Received OBS={obs_shape}, ACT={act_shape}")
-
-    # Create the environment(s) based on env_type
-    if env_type == "RLBASE":
-        print("[Training] RLBASE => reusing AdminManager socket for single environment")
-        # Construct single environment with RLBASE socket
-        # RLBaseBridge uses the admin socket directly for simplicity
-        def make_env():
-            return GymWrapperRLBase(sock=admin.sock, obs_shape=obs_shape, act_shape=act_shape)
-        vec_env = DummyVecEnv([make_env])
-
-    elif env_type == "SINGLE":
-        print("[Training] SINGLE => create new socket for single environment")
-        def make_env():
-            sock = create_unreal_socket(ENV_IP, ENV_PORT)
-            return GymWrapperSingleEnv(sock=sock, obs_shape=obs_shape, act_shape=act_shape)
-        vec_env = DummyVecEnv([make_env])
-
-    elif env_type == "MULTI":
-        print(f"[Training] MULTI => create {env_count} sub-environments")
-
-        def make_env(i):
-            sock = create_unreal_socket(ENV_IP, ENV_PORT)
-            return GymWrapperMultiEnv(sock=sock, obs_shape=obs_shape, act_shape=act_shape, env_id=i)
-        
-        env_fns = [lambda i=i: make_env(i) for i in range(env_count)]
-        vec_env = SubprocVecEnv(env_fns)
-
-    else:
-        raise ValueError("Handshake error: Unknown enviornment type")
+    try:
+        algo_class = ALGOS[algo]
+    except KeyError as e:
+        raise ValueError(f"Unsupported algo '{algo}'. Allowed: {list(ALGOS)}") from e
     
-    # Create the model (by default ppo, add your own if you want)
-    model = PPO(
-        "MlpPolicy",
-        vec_env,
-        verbose=1,
-        learning_rate=LEARNING_RATE,
-        gamma=GAMMA,
-        n_steps=N_STEPS,
-        batch_size=BATCH_SIZE,
-        ent_coef=ENT_COEF,
-        gae_lambda=GAE_LAMBDA,
-        clip_range=CLIP_RANGE,
-        vf_coef=VF_COEF,
-        max_grad_norm=MAX_GRAD_NORM
+    common = cfg["common_parameters"]
+
+    hps = dict(
+        device         = common["device"],
+        learning_rate  = common["learning_rate"],
+        gamma          = common["gamma"],
+        verbose        = common["verbose"],
     )
 
-    # Train the model
-    model.learn(total_timesteps=TOTAL_TIMESTEPS)
-    model.save(MODEL_NAME)
-    print(f"[Training] Model saved as '{MODEL_NAME}'")
+    if algo != "a2c":
+        hps.update(batch_size     = common["batch_size"],)
 
-    # TODO: Notify Unreal that training is complete through admin connection:
-    # NEED TO ADD SEND COMMAND FOR ADMIN SOCKET, CURRENTLY USER JUST MANUALLY CLOSES UNREAL
+    if algo in ("ppo", "a2c"):
+        policy = cfg["on_policy"]
+        hps.update(
+            n_steps    = policy["n_steps"],
+            gae_lambda = policy["gae_lambda"],
+            ent_coef   = policy["ent_coef"],
+        )
+        hps.update(policy.get(algo, {})) 
+    else:
+        policy = cfg["off_policy"]
+        hps.update(
+            buffer_size     = policy["buffer_size"],
+            tau             = policy["tau"],
+            learning_starts = policy["learning_starts"],
+        )
+        hps.update(policy.get(algo, {})) 
+
+    paths = cfg["paths"]
+    resume = cfg.get("load_from_checkpoint", False)
+    total_timesteps = cfg["total_timesteps"]
+    checkpt_freq =cfg["checkpoint_freq"]
+
+    pathlib.Path(paths["save_dir"]).mkdir(parents=True, exist_ok=True)
+
+    return algo_class, hps, paths, resume, total_timesteps, checkpt_freq
+
+# -------------------- TRAINING SCRIPT -------------------- #
+def main():
+    #Read path to config file
+    parser = ap.ArgumentParser()
+    parser.add_argument("--config", type=str, help="Path to config file")
+
+    args = parser.parse_args()
+    if args.config is None:
+        print("Path to config file not found.\n")
+        sys.exit(1)
     
-    admin.close()
+    #Parse config file
+    cfg_file = pathlib.Path(args.config)
+    if not cfg_file.is_file():
+        print(f"Config file not found: {cfg_file}")
+        sys.exit(1)
+
+    algo, hps, paths, resume, total_timesteps, checkpt_freq = load_config(cfg_file)
+
+    #Set up Admin daemon thread and block for handshake
+    meta_q = queue.Queue(maxsize=1)
+    master = AdminTHD(ENV_IP, ENV_PORT, meta_q)
+    master.start()
+    meta_data = meta_q.get() #blocking for master
+    if meta_data["env_type"] is None or meta_data["obs_shape"] == 0 or meta_data["act_shape"] == 0:
+        print("[ERROR] Invalid handshake – aborting.")
+        sys.exit(1)
+    
+    #With admin meta data returned from the queue, set up the sb3 vec_env with gymwrapper 
+    env_fns, is_multi = envTHD(ENV_IP, ENV_PORT, meta_data).build()
+    if is_multi:
+        vec_env = SubprocVecEnv(env_fns, start_method="spawn")
+    else:
+        vec_env = DummyVecEnv(env_fns)
+
+    #Begin training, decide wether to continue training from a checkpoint or start fresh
+    if resume:
+        print("\n =====================Continue training from previous checkpoint======================\n")
+        model = algo.load(paths["previous_model"], env=vec_env, force_reset=False, device=hps["device"])
+    else:
+        model = algo("MlpPolicy", vec_env, **hps)
+
+    #Setup periodic imaging
+    imaging = CheckpointCallback(
+    save_freq=checkpt_freq,
+    save_path=paths["save_dir"],
+    name_prefix="checkpoint"
+    )
+
+    #Train the model
+    model.learn(total_timesteps=total_timesteps, reset_num_timesteps= not resume, callback=imaging)
+
+    #Save model to directory specified in config (automatically created if path not found)
+    model.save(path=paths["save_dir"])
+    print(f"[Training] Model saved to '{paths['save_dir']}'")
+
+    #Close off bridge connection to UE and end training session
+    meta_data["admin"].close()
     vec_env.close()
-    print("[Training] Done")
+
+if __name__ == "__main__":
+    main()
