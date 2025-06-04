@@ -4,6 +4,7 @@ Intermediate/
 *.dll
 *.exp
 *.gen.cpp
+RL_lib_env
 
 .vscode
 __pycache__
