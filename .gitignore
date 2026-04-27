@@ -8,3 +8,9 @@ RL_lib_env
 
 .vscode
 __pycache__
+.planning_docs/
+.env
+dist/
+build/
+*.egg-info/
+venv/
