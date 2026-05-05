@@ -45,6 +45,11 @@ dev = [
 [project.scripts]
 rlp = "rl_platform.cli:main"
 
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (run with -m slow)",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
