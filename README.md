@@ -114,6 +114,6 @@ It is generally recommended you create a virtual enviornment to manage dependenc
 Feel free to contact me at:
 
 @Kevin Chen - kevinz.chen@mail.utoronto.ca\
-@Gary Guo - garyz.guo@mail.utoronto.ca
+@Gary Guo - garyguo2004@gmail.com
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
