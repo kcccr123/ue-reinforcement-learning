@@ -31,6 +31,7 @@ def tcp_server(request):
     thread.start()
     time.sleep(0.1)
     yield server, port
+    server.shutdown()
     thread.join(timeout=2.0)
 
 

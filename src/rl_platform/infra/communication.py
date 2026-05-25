@@ -2,9 +2,12 @@ import msgpack
 from typing import Any
 import struct
 import socket
+import structlog
 from rl_platform.core.specifications import EnvSpec
 import gymnasium as gym
 import numpy as np
+
+log = structlog.get_logger()
 
 
 class MsgSerializer:
@@ -32,14 +35,14 @@ class TCPClient:
             )
         self.serializer = MsgSerializer()
         self.sock.settimeout(90.0)
-        print(f"Created a socket to {self.ip}:{self.port}")
+        log.debug("tcp_connected", host=self.ip, port=self.port)
 
     def send_data(self, data: dict[str, Any]) -> None:
         payload = self.serializer.encode(data)
         if self.sock:
             try:
                 self.sock.sendall(payload)
-                print(f"Sent data to {self.ip}:{self.port}")
+                log.debug("tcp_sent", host=self.ip, port=self.port, msg_type=data.get("type"))
             except Exception as e:
                 raise ConnectionError(
                     f"Error sending data to {self.ip}:{self.port}: {e}, data_type: {data.get('type')}"
@@ -84,9 +87,9 @@ class TCPClient:
         if self.sock:
             try:
                 self.sock.close()
-                print(f"Disconnected socket to {self.ip}:{self.port}")
+                log.debug("tcp_disconnected", host=self.ip, port=self.port)
             except Exception as e:
-                print(f"Error closing socket to {self.ip}:{self.port}: {e}")
+                log.debug("tcp_close_error", host=self.ip, port=self.port, error=str(e))
         self.sock = None
 
 
@@ -114,7 +117,7 @@ class Handshake:
         for a in agent_data:
             scripted = a.get("is_scripted")
             if scripted is True:
-                print(f"Skipping scripted agent {a.get('id')}")
+                log.debug("handshake_skip_scripted_agent", agent_id=a.get("id"))
                 continue
             agent_id = a.get("id")
             observation_shape = a.get("obs_shape")
@@ -147,7 +150,7 @@ class Handshake:
         )
 
     def wait_for_handshake(self) -> EnvSpec:
-        print(f"Waiting for handshake from {self.tcp_client.ip}:{self.tcp_client.port}")
+        log.debug("handshake_waiting", host=self.tcp_client.ip, port=self.tcp_client.port)
 
         while not self.handshake_received:
             data = self.tcp_client.receive_data()
@@ -156,9 +159,7 @@ class Handshake:
                     self.env_spec = self.generate_environment_config(data)
                     if self.env_spec:
                         self.handshake_received = True
-                        print(
-                            f"Handshake received from {self.tcp_client.ip}:{self.tcp_client.port}: {self.env_spec}"
-                        )
+                        log.debug("handshake_received", host=self.tcp_client.ip, port=self.tcp_client.port, env_id=self.env_spec.env_id)
                         return self.env_spec
                     else:
                         raise ValueError(

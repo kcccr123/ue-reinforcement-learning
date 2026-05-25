@@ -34,6 +34,7 @@ def server_and_env(request):
     yield server, env
 
     env.close()
+    server.shutdown()
     thread.join(timeout=2.0)
 
 

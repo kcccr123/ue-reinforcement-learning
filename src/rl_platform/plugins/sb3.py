@@ -38,14 +38,14 @@ class SB3Plugin:
         task: TaskSpec | None,
         total_steps: int,
         callbacks: list[TrainingCallback],
-    ) -> dict[str, float]:
+    ) -> dict[str, float | int]:
 
         if worker_addrs is not None:
             env_fns = [lambda addr=addr: TCPGymEnv(addr[0], addr[1]) for addr in worker_addrs]
         elif env_fns is None:
             raise ValueError("env_fns or worker_addrs is required")
         
-        if task is not None:
+        if task is not None and task.env_params:
             raise NotImplementedError("task-parameterized reset is not supported until M4")
         # Monitor wraps each env so SB3 populates info["episode"] on each
         # episode termination, which is required for the callback bridge to

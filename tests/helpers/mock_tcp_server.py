@@ -19,10 +19,17 @@ class MockTcpServer:
         self.handshake_sent = False
     
     def start(self):
-        self.response_sock, addr = self.listen_sock.accept()
-        self.send_handshake()
-        while self.process_data():
-            pass
+        """Accept and serve connections in a loop until the listen socket closes."""
+        while True:
+            try:
+                self.response_sock, addr = self.listen_sock.accept()
+            except OSError:
+                # listen_sock was closed (shutdown() called)
+                break
+            self.handshake_sent = False
+            self.send_handshake()
+            while self.process_data():
+                pass
     
     def send_data(self, data: dict[str, Any]) -> None:
         payload = self.serializer.encode(data)
@@ -118,6 +125,15 @@ class MockTcpServer:
         self.send_data({"type": "step_result", "agents": {"agent_1": {"obs": obs, "reward": reward, "done": done, "info": info}}, "global": {"done": done}})
 
     def close(self):
-        self.response_sock.close()
-        self.response_sock = None
-        self.listen_sock.close()
+        """Close the current client connection; keep the listen socket open for the next client."""
+        if self.response_sock:
+            self.response_sock.close()
+            self.response_sock = None
+
+    def shutdown(self):
+        """Fully shut down the server (close listen socket and any active connection)."""
+        self.close()
+        try:
+            self.listen_sock.close()
+        except OSError:
+            pass
