@@ -21,7 +21,7 @@ def _cmd_eval(args: argparse.Namespace) -> None:
     from rl_platform.artifacts.runtime import ConfigLoader
     from rl_platform.artifacts.database import Database
     from rl_platform.core.eval import EvalDriver, EvalScenario
-    from rl_platform.core.learn import LEARNER_REGISTRY
+    from rl_platform.plugins import LEARNER_REGISTRY
     from rl_platform.core.specifications import EnvSpec
     from rl_platform.utils.logging import setup_logging
 

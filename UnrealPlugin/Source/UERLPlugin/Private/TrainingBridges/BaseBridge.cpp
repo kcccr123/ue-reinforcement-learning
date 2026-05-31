@@ -1,6 +1,7 @@
 
 #include "TrainingBridges/BaseBridge.h"
 #include "UERLPlugin/Helpers/BPFL_DataHelpers.h"
+#include "TcpConnection/SingleTcpConnection.h"
 
 bool UBaseBridge::Connect_Implementation(const FString& IPAddress, int32 Port, int32 InActionSpaceSize, int32 InObservationSpaceSize)
 {
@@ -15,7 +16,13 @@ bool UBaseBridge::Connect_Implementation(const FString& IPAddress, int32 Port, i
             UE_LOG(LogTemp, Error, TEXT("[UBaseBridge] CreateTcpConnection returned null. Please override CreateTcpConnection in C++ or Blueprint."));
             return false;
         }
-        TcpConnection->SetHandshake(BuildHandshake());
+    }
+
+    // For single-socket connections, pre-load the handshake so AcceptEnvConnection
+    // can fire it immediately when Python connects (before any tick runs).
+    if (USingleTcpConnection* Single = Cast<USingleTcpConnection>(TcpConnection))
+    {
+        Single->SetHandshakeMsg(BuildHandshake());
     }
 
     if (!TcpConnection->StartListening(IPAddress, Port))
@@ -36,9 +43,40 @@ void UBaseBridge::Disconnect()
     }
 }
 
-FString UBaseBridge::BuildHandshake_Implementation()
+FHandshakeMessage UBaseBridge::BuildHandshake()
 {
-    return FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d"), ObservationSpaceSize, ActionSpaceSize);
+    FHandshakeMessage Msg;
+    Msg.env_id = "base_env";
+
+    FAgentInfo Agent;
+    Agent.id          = "agent_1";
+    Agent.obs_shape   = { ObservationSpaceSize };
+    Agent.act_shape   = { ActionSpaceSize };
+    Agent.act_low     = -1.0f;
+    Agent.act_high    =  1.0f;
+    Agent.is_scripted = false;
+
+    Msg.agents.push_back(Agent);
+    return Msg;
+}
+
+bool UBaseBridge::SendHandshake()
+{
+    if (!TcpConnection || !TcpConnection->IsConnected())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[UBaseBridge] SendHandshake: no connected TCP connection."));
+        return false;
+    }
+
+    USingleTcpConnection* Single = Cast<USingleTcpConnection>(TcpConnection);
+    if (!Single)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[UBaseBridge] SendHandshake: connection is not USingleTcpConnection (multi-env not yet migrated to msgpack protocol)."));
+        return false;
+    }
+
+    const FHandshakeMessage Msg = BuildHandshake();
+    return Single->SendMessageEnv(Msg);
 }
 
 void UBaseBridge::StartTraining()
@@ -108,12 +146,22 @@ UBaseTcpConnection* UBaseBridge::CreateTcpConnection_Implementation()
 
 void UBaseBridge::Tick(float DeltaTime)
 {
+    // Flush a queued handshake on the game thread (set by the accept thread when
+    // the env socket connects). Keeps all socket I/O on the game thread.
+    if (USingleTcpConnection* Single = Cast<USingleTcpConnection>(TcpConnection))
+    {
+        Single->FlushPendingHandshake();
+    }
+
     UpdateRL(DeltaTime);
 }
 
 bool UBaseBridge::IsTickable() const
 {
-    return (bIsTraining && TcpConnection && TcpConnection->IsConnected()) || bIsInference;
+    // Tick once a connection is established (not just while training) so the
+    // handshake can be flushed to a probing client before StartTraining() is
+    // called. UpdateRL_Implementation early-returns when not in training mode.
+    return (TcpConnection && TcpConnection->IsConnected()) || bIsInference;
 }
 
 TStatId UBaseBridge::GetStatId() const
