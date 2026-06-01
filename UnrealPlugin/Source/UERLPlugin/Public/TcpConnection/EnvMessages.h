@@ -1,6 +1,13 @@
 #pragma once
 
+#include "CoreMinimal.h"
+
+// msgpack-c is a third-party header-only library that does not satisfy UE's
+// strict warning-as-error settings. Wrap it so its warnings don't fail the build.
+THIRD_PARTY_INCLUDES_START
 #include "msgpack.hpp"
+THIRD_PARTY_INCLUDES_END
+
 #include <map>
 #include <string>
 #include <vector>
