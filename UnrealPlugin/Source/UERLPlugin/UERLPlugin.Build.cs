@@ -29,6 +29,10 @@ public class UERLPlugin : ModuleRules
         string OnnxRuntimePath = Path.Combine(ModuleDirectory, "../../OnnxRuntime");
         string MsgPackPath = Path.Combine(ModuleDirectory, "../../MsgPack");
 
+        // msgpack-c ships its own boost/predef subset; tell it not to look for
+        // a system Boost installation.
+        PublicDefinitions.Add("MSGPACK_NO_BOOST=1");
+
         // Win64
         if (Target.Platform == UnrealTargetPlatform.Win64)
         {
