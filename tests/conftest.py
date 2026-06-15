@@ -1,8 +1,11 @@
-"""Shared fixtures for M0.1 tests."""
+"""Shared fixtures for tests."""
 import gymnasium as gym
 import pytest
+from pathlib import Path
 
 from rl_platform.core.specifications import EnvSpec, TaskSpec
+from rl_platform.artifacts.database import Database
+from rl_platform.artifacts.checkpointing import CheckpointManager
 
 
 # ---------------------------------------------------------------------------
@@ -76,3 +79,26 @@ def configured_plugin(cartpole_env_spec, ppo_config):
     plugin = SB3Plugin()
     plugin.configure(cartpole_env_spec, ppo_config)
     return plugin
+
+
+# ---------------------------------------------------------------------------
+# Database / artifacts helpers (M0.3)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def db(tmp_path) -> Database:
+    """Fresh in-tmp Database instance, closed after test."""
+    database = Database(tmp_path / "test.db")
+    yield database
+    database.close()
+
+
+@pytest.fixture
+def ckpt_mgr(tmp_path, db) -> CheckpointManager:
+    """CheckpointManager wired to the tmp_path db."""
+    return CheckpointManager(data_dir=tmp_path / "checkpoints", database=db)
+
+
+@pytest.fixture
+def sample_task() -> TaskSpec:
+    return TaskSpec(name="test_task")

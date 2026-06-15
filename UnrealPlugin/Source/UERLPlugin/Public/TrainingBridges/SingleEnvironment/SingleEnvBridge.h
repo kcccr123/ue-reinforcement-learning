@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "TrainingBridges/BaseBridge.h"
+#include "TcpConnection/EnvMessages.h"
 #include "SingleEnvBridge.generated.h"
 
 /**
@@ -25,10 +26,20 @@ public:
      */
     virtual void UpdateRL_Implementation(float DeltaTime) override;
 
+public:
+    /**
+     * The agent ID sent in the handshake and expected as the action key in
+     * "step" messages from Python. Must be set before calling Connect().
+     * The project adapter's Blueprint subclass should configure this to match
+     * whatever ID the Python training config expects (e.g. "agent_0").
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SingleEnv|Agent")
+    FString AgentId = TEXT("agent_0");
+
 protected:
 
-    // Override handshake to send multi enviornment configuration settngs
-    FString BuildHandshake_Implementation() override;
+    // Override to populate single-env specific handshake fields using AgentId.
+    virtual FHandshakeMessage BuildHandshake() override;
 
     // Implement factory function for creating
     UBaseTcpConnection* CreateTcpConnection_Implementation() override;

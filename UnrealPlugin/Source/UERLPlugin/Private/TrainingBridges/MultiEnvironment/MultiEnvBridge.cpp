@@ -34,10 +34,14 @@ void UMultiEnvBridge::InitializeEnvironments(int32 InNumEnvironments, bool bInIn
     }
 }
 
-FString UMultiEnvBridge::BuildHandshake_Implementation()
+FHandshakeMessage UMultiEnvBridge::BuildHandshake()
 {
-    return FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d;ENV_TYPE=MULTI;ENV_COUNT=%d"),
-        ObservationSpaceSize, ActionSpaceSize, NumEnvironments);
+    // Multi-env still uses the legacy string protocol via UMultiTcpConnection.
+    // Return the base struct so the signature is satisfied; UBaseBridge::SendHandshake()
+    // will short-circuit because the connection isn't a USingleTcpConnection.
+    FHandshakeMessage Msg = Super::BuildHandshake();
+    Msg.env_id = "multi_env";
+    return Msg;
 }
 
 // -------------------------------------------------------------------------

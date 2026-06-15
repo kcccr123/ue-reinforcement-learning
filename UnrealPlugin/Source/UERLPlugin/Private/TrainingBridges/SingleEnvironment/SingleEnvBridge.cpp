@@ -1,13 +1,24 @@
 #include "TrainingBridges/SingleEnvironment/SingleEnvBridge.h"
-#include "TcpConnection/SingleTcpConnection.h"     
-#include "UERLPlugin/Helpers/PythonMsgParsingHelpers.h"
-#include "UERLPlugin/Helpers/BPFL_DataHelpers.h"         
+#include "TcpConnection/SingleTcpConnection.h"
+#include "TcpConnection/EnvMessages.h"
+#include "UERLPlugin/Helpers/BPFL_DataHelpers.h"
 
 
-FString USingleEnvBridge::BuildHandshake_Implementation()
+FHandshakeMessage USingleEnvBridge::BuildHandshake()
 {
-    return FString::Printf(TEXT("CONFIG:OBS=%d;ACT=%d;ENV_TYPE=SINGLE"),
-        ObservationSpaceSize, ActionSpaceSize);
+    FHandshakeMessage Msg;
+    Msg.env_id = "ue5_single_env";
+
+    FAgentInfo Agent;
+    Agent.id          = TCHAR_TO_UTF8(*AgentId);
+    Agent.obs_shape   = { ObservationSpaceSize };
+    Agent.act_shape   = { ActionSpaceSize };
+    Agent.act_low     = -1.0f;
+    Agent.act_high    =  1.0f;
+    Agent.is_scripted = false;
+
+    Msg.agents.push_back(Agent);
+    return Msg;
 }
 
 UBaseTcpConnection* USingleEnvBridge::CreateTcpConnection_Implementation()
@@ -20,78 +31,114 @@ UBaseTcpConnection* USingleEnvBridge::CreateTcpConnection_Implementation()
 // -------------------------------------------------------------------------
 void USingleEnvBridge::UpdateRL_Implementation(float DeltaTime)
 {
+    if (!bIsTraining) return;
 
-    if (bIsTraining) {
-        // receive response
-        FString PythonMessage = ReceiveData();
+    USingleTcpConnection* Conn = Cast<USingleTcpConnection>(TcpConnection);
+    if (!Conn || !Conn->IsConnected()) return;
 
-        // if command recieved
-        if (!PythonMessage.IsEmpty())
+    const std::string AgentIdStd = TCHAR_TO_UTF8(*AgentId);
+
+    // ---- If an action is still running from a previous tick, check completion ----
+    if (bIsActionRunning)
+    {
+        bIsActionRunning = IsActionRunning();
+        if (!bIsActionRunning)
         {
-            FString ActionString = UPythonMsgParsingHelpers::ParseActionString(PythonMessage);
-            if (ActionString.Contains("RESET"))
-            {
-                // reset if simulation is done
-                HandleReset();
-                bIsActionRunning = false;
-                bool bDone = false;
-                float Reward = CalculateReward(bDone);
-                int32 DoneInt = bDone ? 1 : 0;
-                FString ObsStr = CreateStateString();
-                FString DataToSend = FString::Printf(TEXT("OBS=%sREW=%.2f;DONE=%d"),*ObsStr, Reward, DoneInt);
-                SendData(DataToSend);
-                return;
-            }
-            else {
-                // interpret response and apply given actions
-                HandleResponseActions(ActionString);
+            // Action finished — collect obs/reward/done and send step_result.
+            bool bDone = false;
+            const float Reward = CalculateReward(bDone);
 
-                // Set action running to true
-                bIsActionRunning = true;
-            }
+            FString ObsStr = CreateStateString();
+            TArray<float> ObsArray = UBPFL_DataHelpers::ParseStateString(ObsStr);
+
+            FAgentStepResult AgentResult;
+            AgentResult.obs.assign(ObsArray.GetData(), ObsArray.GetData() + ObsArray.Num());
+            AgentResult.reward = Reward;
+            AgentResult.done   = bDone;
+
+            FStepResultMessage Result;
+            Result.agents[AgentIdStd] = AgentResult;
+            Result.global.done        = bDone;
+
+            Conn->SendMessageEnv(Result);
         }
-
-        // check if an action is running
-        if (bIsActionRunning == true) {
-            bIsActionRunning = IsActionRunning();
-            // if action has concluded send state data as a result of the action
-            if (bIsActionRunning == false) {
-                bool bDone = false;
-                float Reward = CalculateReward(bDone);
-                int32 DoneInt = bDone ? 1 : 0;
-
-                FString ObsStr = CreateStateString();
-                FString DataToSend = FString::Printf(TEXT("OBS=%sREW=%.2f;DONE=%d"), *ObsStr, Reward, DoneInt);
-
-                // Send environment observation, reward, done to Python
-                SendData(DataToSend);
-            }
-        }
-
-    }
-    else if (bIsInference) {
-        // if inference mode, run inference through loaded model instead
-        // inference is tick driven rather then on demand
-
-        if (bIsActionRunning == true) {
-            bIsActionRunning = IsActionRunning();
-
-        }
-        else {
-            FString ActionResponse = RunLocalModelInference(CreateStateString());
-            if (!ActionResponse.IsEmpty()) {
-                HandleResponseActions(ActionResponse);
-                bIsActionRunning = true;
-            }
-        }
-
-
+        // Don't try to read new commands while an action is mid-flight.
+        return;
     }
 
+    // ---- Poll for the next command from Python (non-blocking) ----
+    FClientMessage Msg;
+    if (!Conn->ReceiveMessageEnv(Msg))
+    {
+        return; // No complete frame yet — come back next tick.
+    }
+
+    if (Msg.type == "reset")
+    {
+        HandleReset();
+
+        FString ObsStr = CreateStateString();
+        TArray<float> ObsArray = UBPFL_DataHelpers::ParseStateString(ObsStr);
+
+        FAgentResetResult AgentResult;
+        AgentResult.obs.assign(ObsArray.GetData(), ObsArray.GetData() + ObsArray.Num());
+
+        FResetResultMessage Result;
+        Result.agents[AgentIdStd] = AgentResult;
+
+        Conn->SendMessageEnv(Result);
+    }
+    else if (Msg.type == "step")
+    {
+        if (Msg.actions.empty())
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[USingleEnvBridge] Received step with no actions."));
+            return;
+        }
+
+        // Look up this agent's actions; fall back to first entry if ID not matched.
+        const std::vector<float>* ActionVec = nullptr;
+        auto It = Msg.actions.find(AgentIdStd);
+        if (It != Msg.actions.end())
+        {
+            ActionVec = &It->second;
+        }
+        else
+        {
+            ActionVec = &Msg.actions.begin()->second;
+            UE_LOG(LogTemp, Warning, TEXT("[USingleEnvBridge] Agent ID '%s' not in step actions; using first entry."), *AgentId);
+        }
+
+        // Convert float vector to comma-separated FString for the Blueprint callback.
+        FString ActionStr;
+        for (int32 i = 0; i < static_cast<int32>(ActionVec->size()); ++i)
+        {
+            if (i > 0) ActionStr += TEXT(",");
+            ActionStr += FString::SanitizeFloat((*ActionVec)[i]);
+        }
+
+        HandleResponseActions(ActionStr);
+        bIsActionRunning = true;
+    }
+    else if (Msg.type == "close")
+    {
+        // Client is done with this episode/run (e.g. Coordinator probe closing,
+        // or training/eval finishing). Tear down just the env socket and keep
+        // listening so the next client (training after probe, or a later run)
+        // can connect. Reset action state so the next client starts clean.
+        UE_LOG(LogTemp, Log, TEXT("[USingleEnvBridge] Received close. Re-arming for next client."));
+        bIsActionRunning = false;
+        Conn->ResetEnvConnection();
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[USingleEnvBridge] Unknown message type: %s"),
+            UTF8_TO_TCHAR(Msg.type.c_str()));
+    }
 }
 
 // -------------------------------------------------------------------------
-// Environment Callbacks 
+// Environment Callbacks (default no-op implementations; override in Blueprint)
 // -------------------------------------------------------------------------
 float USingleEnvBridge::CalculateReward_Implementation(bool& bIsDone)
 {

@@ -41,8 +41,10 @@ public:
     void InitializeEnvironments(int32 InNumEnvironments = 1, bool bInInferenceMode = false);
 
 protected:
-    // Override handshake to send multi enviornment configuration settngs
-    virtual FString BuildHandshake_Implementation() override;
+    // Override handshake to populate multi-env specific fields.
+    // NOTE: multi-env is not yet migrated to the msgpack protocol; SendHandshake()
+    // on the base class will refuse to send for non-Single connections.
+    virtual FHandshakeMessage BuildHandshake() override;
 
     // Training loop 
     virtual void UpdateRL_Implementation(float DeltaTime) override;
