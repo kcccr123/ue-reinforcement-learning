@@ -7,6 +7,7 @@
 #include "Tickable.h"
 #include "Inference/InferenceInterfaces/InferenceInterface.h"
 #include "TcpConnection/BaseTcpConnection.h"
+#include "TcpConnection/EnvMessages.h"
 #include "BaseBridge.generated.h"
 
 class UBaseTcpConnection;
@@ -132,11 +133,22 @@ protected:
     virtual FString ReceiveData();
 
     /**
-     * Sends a handshake message that sets up training on Python Module (subclasses may override).
+     * Build the structured handshake describing this env's agents/spaces.
+     * Subclasses override in C++ to customize env_id / per-agent shapes / metadata.
+     * Not BlueprintNativeEvent because FHandshakeMessage is a plain C++ struct (not USTRUCT).
      */
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Bridge|Connection")
-    FString BuildHandshake();
-    virtual FString BuildHandshake_Implementation();
+    virtual FHandshakeMessage BuildHandshake();
+
+public:
+    /**
+     * Build the handshake via BuildHandshake() and send it as a length-prefixed
+     * msgpack frame over the env socket. Call once the env socket is connected.
+     * Returns false if the connection isn't a USingleTcpConnection or isn't connected.
+     */
+    UFUNCTION(BlueprintCallable, Category = "Bridge|Connection")
+    virtual bool SendHandshake();
+
+protected:
 
     /**
      * Factory for the TCP connection object.

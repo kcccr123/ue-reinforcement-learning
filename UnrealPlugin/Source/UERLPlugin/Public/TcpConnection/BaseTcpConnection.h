@@ -62,9 +62,9 @@ public:
 
     /**
      * Sends a UTF-8 string to environment socket(s).
-     * Subclass must define whether it's single or multiple env sockets.
+     * MultiTcpConnection overrides this. SingleTcpConnection uses the struct overload instead.
      */
-    virtual bool SendMessageEnv(const FString& Data) PURE_VIRTUAL(UBaseTcpConnection::SendMessageEnv, return false;);
+    virtual bool SendMessageEnv(const FString& Data) { return false; }
 
     /**
      * Receives a UTF-8 string from the admin socket, returns empty if none is pending.
@@ -74,10 +74,9 @@ public:
 
     /**
      * Receives a UTF-8 string from environment socket(s).
-     * Subclass must define logic (single, multi, round-robin, etc.).
-     * Expects newline char as delimiter.
+     * MultiTcpConnection overrides this. SingleTcpConnection uses the templated overload instead.
      */
-    virtual FString ReceiveMessageEnv(int32 BufSize = 1024) PURE_VIRTUAL(UBaseTcpConnection::ReceiveMessageEnv, return TEXT(""););
+    virtual FString ReceiveMessageEnv(int32 BufSize = 1024) { return TEXT(""); }
 
     /**
      * Checks if admin socket and enviornment sockets are set and ready for training loop logic

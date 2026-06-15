@@ -10,6 +10,7 @@ class EnvSpec:
     action_spaces: dict[str, gym.Space]
     is_multi_agent: bool
     max_episode_steps: int | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 class EnvSpecValidationError(ValueError):
     """Raised when EnvSpec validation fails."""

@@ -1,0 +1,32 @@
+run_name: ue5_vertical_slice
+total_steps: 50000
+data_dir: runs
+
+env:
+  # env_id omitted -> Coordinator uses a TCP/UE5 worker (not a local gym env)
+  is_multi_agent: false
+
+worker:
+  host: 127.0.0.1
+  port: 7777
+  num_workers: 1
+
+learner:
+  type: sb3
+  params:
+    algorithm: PPO
+    device: cpu
+    learning_rate: 0.0003
+    n_steps: 2048
+    batch_size: 128
+    n_epochs: 10
+    gamma: 0.99
+    gae_lambda: 0.95
+    verbose: 1
+
+checkpoint:
+  save_freq: 10000
+  keep_best: true
+
+eval:
+  eval_freq: 0
