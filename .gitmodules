@@ -1,0 +1,3 @@
+[submodule "UnrealPlugin/MsgPack"]
+	path = UnrealPlugin/MsgPack
+	url = https://github.com/msgpack/msgpack-c
