@@ -3,7 +3,7 @@ from typing import Any
 import struct
 import socket
 import structlog
-from rl_platform.core.specifications import EnvSpec
+from rl_platform.specs import EnvSpec
 import gymnasium as gym
 import numpy as np
 
