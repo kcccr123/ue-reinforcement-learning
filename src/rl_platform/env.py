@@ -1,5 +1,5 @@
 import gymnasium as gym
-from rl_platform.infra.communication import TCPClient, Handshake
+from rl_platform.protocol import TCPClient, Handshake
 from typing import Any
 import numpy as np
 

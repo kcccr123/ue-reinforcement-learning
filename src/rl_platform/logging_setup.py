@@ -45,7 +45,3 @@ def setup_logging(*, json: bool = False, level: str = "INFO") -> None:
     root.handlers.clear()
     root.addHandler(handler)
     root.setLevel(log_level)
-
-
-def get_logger(**initial_context: object) -> structlog.stdlib.BoundLogger:
-    return structlog.get_logger(**initial_context)
