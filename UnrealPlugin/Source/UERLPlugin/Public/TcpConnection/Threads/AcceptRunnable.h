@@ -3,7 +3,7 @@
 #include "HAL/Runnable.h"
 #include "HAL/ThreadSafeBool.h"
 
-class UBaseTcpConnection;
+class UTcpConnection;
 
 /**
  * FRunnable that polls a listening socket for new connections
@@ -12,7 +12,7 @@ class UBaseTcpConnection;
 class FAcceptRunnable : public FRunnable
 {
 public:
-    explicit FAcceptRunnable(UBaseTcpConnection* InOwner);
+    explicit FAcceptRunnable(UTcpConnection* InOwner);
     virtual ~FAcceptRunnable() override;
 
     // FRunnable interface
@@ -20,6 +20,6 @@ public:
     virtual void Stop() override;
 
 private:
-    UBaseTcpConnection* Owner;
-    FThreadSafeBool       bStop;
+    UTcpConnection* Owner;
+    FThreadSafeBool bStop;
 };

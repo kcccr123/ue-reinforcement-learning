@@ -1,14 +1,14 @@
-// SingleTcpConnection.h
+// TcpConnection.h
 #pragma once
 
 #include "CoreMinimal.h"
-#include "BaseTcpConnection.h"
+#include "UObject/NoExportTypes.h"
+#include "Sockets.h"
 #include "TcpConnection/EnvMessages.h"
 #include "HAL/ThreadSafeBool.h"
-#include "SingleTcpConnection.generated.h"
+#include "TcpConnection.generated.h"
 
 class FAcceptRunnable;
-class FSocket;
 
 /**
  * Basic Single-environment TCP connection.
@@ -17,15 +17,15 @@ class FSocket;
  * All message schemas are defined in EnvMessages.h.
  */
 UCLASS()
-class UERLPLUGIN_API USingleTcpConnection : public UBaseTcpConnection
+class UERLPLUGIN_API UTcpConnection : public UObject
 {
     GENERATED_BODY()
 
 public:
-    virtual ~USingleTcpConnection() override { CloseConnection(); }
+    ~UTcpConnection() { CloseConnection(); }
 
     // Listen on IP/Port, spawn acceptance thread
-    virtual bool StartListening(const FString& IPAddress, int32 Port) override;
+    bool StartListening(const FString& IPAddress, int32 Port);
 
     // Store the handshake to be auto-sent when the first connection arrives.
     // Call this before StartListening so it is ready when Python connects.
@@ -44,12 +44,9 @@ public:
         }
     }
 
-    // Single-socket protocol: the first (and only) incoming connection is the env
-    // socket. Overrides the base two-socket logic so we never use AdminSocket.
-    virtual bool AcceptConnection() override;
-
-    // Accept environment connection
-    virtual bool AcceptEnvConnection(FSocket* InNewSocket) override;
+    // Single-socket protocol: the first (and only) incoming connection becomes the
+    // env socket. Further connections are rejected until ResetEnvConnection() re-arms.
+    bool AcceptConnection();
 
     // Game-thread-only: tear down just the current env socket (e.g. after the
     // client sends "close" or disconnects) and re-arm the accept thread so the
@@ -58,13 +55,16 @@ public:
     // connection, then later eval / re-probe runs — without relaunching.
     void ResetEnvConnection();
 
+    // Get listening socket
+    FSocket* GetListeningSocket();
+
     // Accepts any MSGPACK_DEFINE_MAP struct (FHandshakeMessage, FStepResultMessage, FResetResultMessage, ...)
     template<typename T>
     bool SendMessageEnv(const T& Msg)
     {
         if (!EnvSocket)
         {
-            UE_LOG(LogTemp, Warning, TEXT("[USingleTcpConnection] No socket to send on."));
+            UE_LOG(LogTemp, Warning, TEXT("[UTcpConnection] No socket to send on."));
             return false;
         }
 
@@ -87,11 +87,11 @@ public:
         int32 BytesSent = 0;
         if (!EnvSocket->Send(Packet.GetData(), Packet.Num(), BytesSent) || BytesSent != Packet.Num())
         {
-            UE_LOG(LogTemp, Warning, TEXT("[USingleTcpConnection] Send failed (%d/%d bytes)."), BytesSent, Packet.Num());
+            UE_LOG(LogTemp, Warning, TEXT("[UTcpConnection] Send failed (%d/%d bytes)."), BytesSent, Packet.Num());
             return false;
         }
 
-        UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Sent %d bytes (%d payload)."), Packet.Num(), PayloadLen);
+        UE_LOG(LogTemp, Log, TEXT("[UTcpConnection] Sent %d bytes (%d payload)."), Packet.Num(), PayloadLen);
         return true;
     }
 
@@ -104,7 +104,7 @@ public:
     {
         if (!EnvSocket)
         {
-            UE_LOG(LogTemp, Error, TEXT("[USingleTcpConnection] No socket to receive on."));
+            UE_LOG(LogTemp, Error, TEXT("[UTcpConnection] No socket to receive on."));
             return false;
         }
 
@@ -152,7 +152,7 @@ public:
         }
         catch (const std::exception& e)
         {
-            UE_LOG(LogTemp, Warning, TEXT("[USingleTcpConnection] msgpack unpack failed: %s"), UTF8_TO_TCHAR(e.what()));
+            UE_LOG(LogTemp, Warning, TEXT("[UTcpConnection] msgpack unpack failed: %s"), UTF8_TO_TCHAR(e.what()));
         }
 
         // Always consume the frame so a bad message doesn't wedge the buffer.
@@ -160,16 +160,16 @@ public:
 
         if (bOk)
         {
-            UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Received %u byte msgpack message."), PayloadLen);
+            UE_LOG(LogTemp, Log, TEXT("[UTcpConnection] Received %u byte msgpack message."), PayloadLen);
         }
         return bOk;
     }
 
     // Clean up
-    virtual void CloseConnection() override;
+    void CloseConnection();
 
     // start thread for accepting incoming connections
-    virtual void StartAcceptThread() override;
+    void StartAcceptThread();
 
 protected:
     // Stop and destroy the accept thread (if any). Safe to call when none runs.
@@ -178,13 +178,21 @@ protected:
 public:
 
     // IsConnected returns true once the single env socket is established.
-    // AdminSocket is unused in the single-socket protocol.
-    virtual bool IsConnected() const override
+    bool IsConnected() const
     {
         return EnvSocket != nullptr;
     }
 
 protected:
+
+    // Main listening socket; accepted connections become environment sockets.
+    FSocket* ListeningSocket = nullptr;
+
+    // Accept thread
+    FRunnableThread* AcceptThreadRef = nullptr;
+    TSharedPtr<FAcceptRunnable> AcceptRunnableRef = nullptr;
+    bool bStopAcceptThreadRef = false;
+
     // The environment socket (the one and only socket for the new protocol).
     // Written once on the accept thread, then only touched on the game thread.
     FSocket* EnvSocket = nullptr;

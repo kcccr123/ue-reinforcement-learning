@@ -1,21 +1,27 @@
-﻿#include "TcpConnection/SingleTcpConnection.h"
+﻿#include "TcpConnection/TcpConnection.h"
 #include "SocketSubsystem.h"
 #include "Common/TcpSocketBuilder.h"
 #include "HAL/PlatformProcess.h"
 #include "TcpConnection/Threads/AcceptRunnable.h"
 
-bool USingleTcpConnection::StartListening(const FString& IPAddress, int32 Port)
+FSocket* UTcpConnection::GetListeningSocket()
+{
+    return ListeningSocket;
+}
+
+bool UTcpConnection::StartListening(const FString& IPAddress, int32 Port)
 {
     CloseConnection();
 
     ISocketSubsystem* SocketSubsystem = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
     if (!SocketSubsystem)
     {
-        UE_LOG(LogTemp, Error, TEXT("[USingleTcpConnection] Socket subsystem not found!"));
+        UE_LOG(LogTemp, Error, TEXT("[UTcpConnection] Socket subsystem not found!"));
         return false;
     }
 
-    // 2 connections: admin then single env
+    // Only one env socket is used at a time, but a small backlog lets the next
+    // client queue while the previous one is being torn down.
     ListeningSocket = FTcpSocketBuilder(TEXT("SingleEnvListener"))
         .AsReusable()
         .BoundToAddress(FIPv4Address::Any)
@@ -24,23 +30,23 @@ bool USingleTcpConnection::StartListening(const FString& IPAddress, int32 Port)
 
     if (!ListeningSocket)
     {
-        UE_LOG(LogTemp, Error, TEXT("[USingleTcpConnection] Failed to create listening socket."));
+        UE_LOG(LogTemp, Error, TEXT("[UTcpConnection] Failed to create listening socket."));
         return false;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Listening on %s:%d"), *IPAddress, Port);
+    UE_LOG(LogTemp, Log, TEXT("[UTcpConnection] Listening on %s:%d"), *IPAddress, Port);
     StartAcceptThread();
     return true;
 }
 
-void USingleTcpConnection::StartAcceptThread()
+void UTcpConnection::StartAcceptThread()
 {
     // Ensure any previous accept thread is fully torn down before starting a new
     // one (ResetEnvConnection re-arms accept across client reconnects).
     TeardownAcceptThread();
 
     bStopAcceptThreadRef = false;
-    AcceptRunnableRef = MakeShareable(new FAcceptRunnable(this));
+    AcceptRunnableRef = MakeShared<FAcceptRunnable>(this);
     AcceptThreadRef = FRunnableThread::Create(
         AcceptRunnableRef.Get(),
         TEXT("SingleEnvAcceptThread"),
@@ -50,15 +56,15 @@ void USingleTcpConnection::StartAcceptThread()
 
     if (!AcceptThreadRef)
     {
-        UE_LOG(LogTemp, Error, TEXT("[USingleTcpConnection] Failed to start accept thread."));
+        UE_LOG(LogTemp, Error, TEXT("[UTcpConnection] Failed to start accept thread."));
     }
     else
     {
-        UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Accept thread started."));
+        UE_LOG(LogTemp, Log, TEXT("[UTcpConnection] Accept thread started."));
     }
 }
 
-void USingleTcpConnection::TeardownAcceptThread()
+void UTcpConnection::TeardownAcceptThread()
 {
     bStopAcceptThreadRef = true;
 
@@ -75,14 +81,13 @@ void USingleTcpConnection::TeardownAcceptThread()
     AcceptRunnableRef.Reset();
 }
 
-bool USingleTcpConnection::AcceptConnection()
+bool UTcpConnection::AcceptConnection()
 {
     // Single-socket protocol: treat the very first connection as the env socket.
-    // We bypass the base-class admin-socket logic entirely.
     ISocketSubsystem* SocketSubsystem = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
     if (!SocketSubsystem || !ListeningSocket)
     {
-        UE_LOG(LogTemp, Error, TEXT("[USingleTcpConnection] AcceptConnection: no listening socket."));
+        UE_LOG(LogTemp, Error, TEXT("[UTcpConnection] AcceptConnection: no listening socket."));
         return false;
     }
 
@@ -93,20 +98,15 @@ bool USingleTcpConnection::AcceptConnection()
         return false;
     }
 
-    return AcceptEnvConnection(NewSock);
-}
-
-bool USingleTcpConnection::AcceptEnvConnection(FSocket* InNewSocket)
-{
     if (EnvSocket)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[USingleTcpConnection] Already have env socket. Rejecting new."));
-        InNewSocket->Close();
-        ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(InNewSocket);
+        UE_LOG(LogTemp, Warning, TEXT("[UTcpConnection] Already have env socket. Rejecting new."));
+        NewSock->Close();
+        ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(NewSock);
         return false;
     }
 
-    EnvSocket = InNewSocket;
+    EnvSocket = NewSock;
 
     // Stop accepting more connections — we only need one.
     if (AcceptRunnableRef.IsValid())
@@ -118,12 +118,12 @@ bool USingleTcpConnection::AcceptEnvConnection(FSocket* InNewSocket)
     // socket Send/Recv stays on one thread. Setting this atomic last also
     // publishes the EnvSocket write to the game thread.
     bHandshakePending = true;
-    UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Env socket connected. Handshake queued for game thread."));
+    UE_LOG(LogTemp, Log, TEXT("[UTcpConnection] Env socket connected. Handshake queued for game thread."));
 
     return true;
 }
 
-void USingleTcpConnection::ResetEnvConnection()
+void UTcpConnection::ResetEnvConnection()
 {
     // Tear down only the env socket; keep the listening socket open so the next
     // client can connect. Called on the game thread after a "close" / disconnect.
@@ -141,16 +141,16 @@ void USingleTcpConnection::ResetEnvConnection()
 
     if (!ListeningSocket)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[USingleTcpConnection] ResetEnvConnection: no listening socket; cannot re-arm accept."));
+        UE_LOG(LogTemp, Warning, TEXT("[UTcpConnection] ResetEnvConnection: no listening socket; cannot re-arm accept."));
         return;
     }
 
     // Re-arm acceptance for the next client.
     StartAcceptThread();
-    UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Env connection reset; accepting new connections."));
+    UE_LOG(LogTemp, Log, TEXT("[UTcpConnection] Env connection reset; accepting new connections."));
 }
 
-void USingleTcpConnection::CloseConnection()
+void UTcpConnection::CloseConnection()
 {
     TeardownAcceptThread();
 
@@ -175,5 +175,5 @@ void USingleTcpConnection::CloseConnection()
     PartialDataBytes.Reset();
     bHandshakePending = false;
 
-    UE_LOG(LogTemp, Log, TEXT("[USingleTcpConnection] Closed listening + env sockets."));
+    UE_LOG(LogTemp, Log, TEXT("[UTcpConnection] Closed listening + env sockets."));
 }

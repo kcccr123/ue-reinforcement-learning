@@ -2,10 +2,10 @@
 
 
 #include "TcpConnection/Threads/AcceptRunnable.h"
-#include "TcpConnection/BaseTcpConnection.h"
+#include "TcpConnection/TcpConnection.h"
 #include "HAL/PlatformProcess.h"
 
-FAcceptRunnable::FAcceptRunnable(UBaseTcpConnection* InOwner)
+FAcceptRunnable::FAcceptRunnable(UTcpConnection* InOwner)
     : Owner(InOwner)
     , bStop(false)
 {

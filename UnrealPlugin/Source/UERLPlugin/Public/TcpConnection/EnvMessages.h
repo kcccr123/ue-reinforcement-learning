@@ -25,8 +25,9 @@ struct FAgentInfo
     float                 act_low      = -1.0f;
     float                 act_high     =  1.0f;
     bool                  is_scripted  = false;
+    std::string           team;
 
-    MSGPACK_DEFINE_MAP(id, obs_shape, act_shape, act_low, act_high, is_scripted);
+    MSGPACK_DEFINE_MAP(id, obs_shape, act_shape, act_low, act_high, is_scripted, team);
 };
 
 /** Sent once on connect: describes the environment and its agents. */

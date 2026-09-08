@@ -16,6 +16,7 @@ FHandshakeMessage USingleEnvBridge::BuildHandshake()
     Agent.act_low     = -1.0f;
     Agent.act_high    =  1.0f;
     Agent.is_scripted = false;
+    Agent.team        = "t_1";
 
     Msg.agents.push_back(Agent);
     return Msg;

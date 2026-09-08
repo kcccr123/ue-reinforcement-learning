@@ -55,6 +55,7 @@ FHandshakeMessage UBaseBridge::BuildHandshake()
     Agent.act_low     = -1.0f;
     Agent.act_high    =  1.0f;
     Agent.is_scripted = false;
+    Agent.team        = "t_1";
 
     Msg.agents.push_back(Agent);
     return Msg;
@@ -71,7 +72,7 @@ bool UBaseBridge::SendHandshake()
     USingleTcpConnection* Single = Cast<USingleTcpConnection>(TcpConnection);
     if (!Single)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[UBaseBridge] SendHandshake: connection is not USingleTcpConnection (multi-env not yet migrated to msgpack protocol)."));
+        UE_LOG(LogTemp, Warning, TEXT("[UBaseBridge] SendHandshake: connection is not a USingleTcpConnection."));
         return false;
     }
 

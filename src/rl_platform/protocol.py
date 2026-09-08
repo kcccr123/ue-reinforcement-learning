@@ -105,6 +105,7 @@ class Handshake:
         agent_ids = []
         observation_spaces = {}
         action_spaces = {}
+        teams = {}
         if agent_data is None:
             raise ValueError(
                 f"Handshake missing 'agents' field in {self.tcp_client.ip}:{self.tcp_client.port}"
@@ -132,6 +133,10 @@ class Handshake:
                 low=act_low, high=act_high, shape=tuple(action_shape)
             )
 
+            team = a.get("team")
+            if team:
+                teams[agent_id] = str(team)
+
         is_multi_agent = len(agent_ids) > 1
         metadata = data.get("metadata", {})
 
@@ -146,6 +151,7 @@ class Handshake:
             observation_spaces=observation_spaces,
             action_spaces=action_spaces,
             is_multi_agent=is_multi_agent,
+            teams=teams,
             metadata=metadata,
         )
 

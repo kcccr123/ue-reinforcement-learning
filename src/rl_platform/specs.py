@@ -9,6 +9,7 @@ class EnvSpec:
     observation_spaces: dict[str, gym.Space]
     action_spaces: dict[str, gym.Space]
     is_multi_agent: bool
+    teams: dict[str, str] = field(default_factory=dict)
     max_episode_steps: int | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
